@@ -1,0 +1,30 @@
+set(MODULE VulkanRenderer)
+
+add_library(${MODULE} STATIC
+  vk_renderer.cpp
+  vk_swapchain.cpp
+  vk_pipeline.cpp
+  vk_texture.cpp
+  vk_material.cpp
+)
+
+target_compile_definitions(VulkanRenderer PRIVATE
+  GLFW_INCLUDE_VULKAN
+  VK_USE_PLATFORM_WIN32_KHR
+)
+
+target_include_directories(${MODULE} PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}
+  ${Vulkan_INCLUDE_DIRS}
+  ${Stb_INCLUDE_DIR}
+)
+
+target_link_libraries(${MODULE} PUBLIC 
+  
+)
+
+target_link_libraries(${MODULE} PRIVATE
+	fmt::fmt
+  # assimp::assimp
+  Vulkan::Vulkan
+)

@@ -1,0 +1,5 @@
+*.pdb
+/build/
+/release/
+*.zip
+# /bin/

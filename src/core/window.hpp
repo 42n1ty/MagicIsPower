@@ -1,0 +1,37 @@
+#pragma once
+
+#include <GLFW/glfw3.h>
+#include <string>
+#include <functional>
+
+namespace mip {
+  
+  enum class RendererType : uint16_t;
+  
+  class Window {
+  public:
+    Window(RendererType rType, int width, int height, const std::string& title, bool fullscreen);
+    ~Window();
+
+    Window(const Window&) = delete;
+    Window& operator=(const Window&) = delete;
+
+    bool shouldClose() const;
+    void setShouldClose(bool flag) {glfwSetWindowShouldClose(m_Window, flag);}
+    GLFWwindow* getWindow() const { return m_Window; }
+    
+    void pollEvents();
+
+    float getAspectRatio() const;
+    int m_Width;
+    int m_Height;
+
+  private:
+    GLFWwindow* m_Window;
+    bool isFullscreen;
+
+    static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+    static void error_callback(int error, const char* description);
+  };
+  
+}; //mip
