@@ -1,6 +1,9 @@
 #include "app.hpp"
 #include "../common/logger.hpp"
 #include "../graphics/renderer/vulkan/vk_renderer.hpp"
+#include "../game/components.hpp"
+#include "../game/loaders.hpp"
+#include "../game/systems.hpp"
 
 namespace mip {
   
@@ -39,15 +42,63 @@ namespace mip {
     // }
     // model==================================================
     
-    // sprite==================================================
-    m_sprite = std::make_unique<Sprite>();
-    if(!m_sprite->init(m_renderer.get(), "../../assets/textures/1.png")) {
-      Logger::error("Failed to init sprite");
+    // scene==================================================
+    m_mang = std::make_unique<ecs::Manager>();
+    
+    // 1. Components
+    m_mang->registerComponent<game::Transform>();
+    m_mang->registerComponent<game::Sprite>();
+    
+    // 2. Loaders + Assets
+    game::TextureLoader tLoader{m_renderer.get()};
+    m_mang->registerAsset<std::shared_ptr<ITexture>>(tLoader);
+    
+    // 3. Systems
+    m_mang->registerSystem<game::RenderSystem>(m_renderer.get());
+    
+    // 4. Entities
+    auto map = m_mang->createEntity();
+    m_mang->addComponent(map, game::Transform{
+      .pos = {m_Window->m_Width / 2, m_Window->m_Height / 2},
+      .scale = {m_Window->m_Width, m_Window->m_Height},
+      .rot = 0.f,
+      .z = 0
+    });
+    auto texHandle = m_mang->loadAsset<std::shared_ptr<ITexture>>("../../assets/textures/1.png");
+    auto mapMat = m_renderer->createMaterial("../../assets/shaders/shader.spv");
+    if(!mapMat) {
+      Logger::error("Failed to create material for sprite!");
       return false;
     }
-    m_sprite->setPos({1280.f / 2.f, 720.f / 2.f});
-    m_sprite->setScale({m_Window->m_Width, m_Window->m_Height});
-    // sprite==================================================
+    if (auto tex = m_mang->getAsset(texHandle)) {
+      mapMat->setTexture(0, *tex);
+    }
+    m_mang->addComponent(map, game::Sprite{
+      .mesh = m_renderer->getGlobalQuad(),
+      .material = mapMat
+    });
+    
+    auto player = m_mang->createEntity();
+    m_mang->addComponent(player, game::Transform{
+      .pos = {m_Window->m_Width / 2, m_Window->m_Height / 2},
+      .scale = {250, 250},
+      .rot = 0.f,
+      .z = 1
+    });
+    texHandle = m_mang->loadAsset<std::shared_ptr<ITexture>>("../../assets/textures/txtr.jpg");
+    auto playerMat = m_renderer->createMaterial("../../assets/shaders/shader.spv");
+    if(!playerMat) {
+      Logger::error("Failed to create material for sprite!");
+      return false;
+    }
+    if (auto tex = m_mang->getAsset(texHandle)) {
+      playerMat->setTexture(0, *tex);
+    }
+    m_mang->addComponent(player, game::Sprite{
+      .mesh = m_renderer->getGlobalQuad(),
+      .material = playerMat
+    });
+    // scene==================================================
     
     Logger::info("Application initialized successfully");
     return true;
@@ -65,28 +116,14 @@ namespace mip {
       
       processInput(m_Window->getWindow(), deltaTime);
       
-      // m_model->updAnim(deltaTime);
-      
       CameraInfo camData{};
-      // glm::vec3 eyePos = glm::vec3(0.f, 2.f, 5.f);
-      // glm::vec3 center = glm::vec3(0.f, 0.f, 0.f);
-      // glm::vec3 upV = glm::vec3(0.f, 1.f, 0.f);
       camData.pos = glm::vec3(0.f);
-      // camData.view = glm::lookAt(eyePos, center, upV);
       camData.view = glm::mat4(1.f);
-      // camData.projection = glm::perspective(glm::radians(45.f), static_cast<float>(m_Window->m_Width) / static_cast<float>(m_Window->m_Height), 0.1f, 100.f);
       camData.projection = glm::ortho(0.f, static_cast<float>(m_Window->m_Width), 0.f, static_cast<float>(m_Window->m_Height), -1.f, 1.f);
       
       if(!m_renderer->beginFrame(camData)) break;
       
-      // glm::mat4 modelTransform = glm::mat4(1.f);
-      // modelTransform *= m_model->getNormMatrix();
-      // if(!m_model->draw(m_renderer.get(), modelTransform)){
-      //   // Logger::error("BREAK");
-      //   break;
-      // }
-      
-      m_sprite->draw(m_renderer.get());
+      m_mang->update(deltaTime);
       
       if(!m_renderer->endFrame()) break;
       

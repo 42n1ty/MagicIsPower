@@ -4,7 +4,7 @@
 
 namespace mip {
   
-  static bool  findSupFormat(
+  static bool findSupFormat(
     vk::Format& format,
     const std::vector<vk::Format>& candidates,
     vk::ImageTiling tiling,

@@ -56,8 +56,6 @@ namespace mip {
     
     bool framebufferResized = false;
     
-    // std::shared_ptr<IMesh> getGlobalQuad() {return m_globQuad;} //for 2D optimization
-    
   private:
     
     // INIT FUNCS====================================================================================================
@@ -127,7 +125,7 @@ namespace mip {
     uint32_t m_curImgIndex{0};
     
     UBOManager<CameraData> m_cameraUBO;
-    UBOManager<ObjectData> m_objectUBO;
+    // UBOManager<ObjectData> m_objectUBO;
     // UBOManager<BoneData> m_bonesUBO;
     
     VulkanSwapchain m_sc;
@@ -137,8 +135,6 @@ namespace mip {
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
     
     Window* m_wnd;
-    
-    // std::shared_ptr<IMesh> m_globQuad{nullptr}; // for 2D optimization
     
     size_t m_curFrame = 0;
     uint32_t m_graphQI;

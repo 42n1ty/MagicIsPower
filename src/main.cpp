@@ -7,7 +7,7 @@ int main() {
   
   mip::Application app;
   if(!app.init()) {
-    mip::Logger::error("Failed to init app");
+    Logger::error("Failed to init app");
     return -1;
   }
   app.run();

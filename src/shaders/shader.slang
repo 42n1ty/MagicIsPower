@@ -21,8 +21,13 @@ struct BoneData {
 };
 
 [[vk::binding(0, 0)]] ConstantBuffer<CameraData> camera;
-[[vk::binding(2, 0)]] ConstantBuffer<ObjectData> object;
+// [[vk::binding(2, 0)]] ConstantBuffer<ObjectData> object;
 // [[vk::binding(3, 0)]] ConstantBuffer<BoneData> bones;
+
+struct PushConstants {
+    float4x4 model;
+};
+[[vk::push_constant]] PushConstants pc;
 
 struct VSOutput {
     float4 pos : SV_Position;
@@ -45,7 +50,7 @@ VSOutput vertMain(VSInput input) {
     // }
     //anim==========
     
-    output.pos = mul(camera.proj, mul(camera.view, mul(object.model, float4(input.inPos, 0.f, 1.f))));
+    output.pos = mul(camera.proj, mul(camera.view, mul(pc.model, float4(input.inPos, 0.f, 1.f))));
     // output.clr = input.inClr;
     output.texCoord = input.inTexCoord;
     return output;

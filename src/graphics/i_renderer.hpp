@@ -39,13 +39,14 @@ namespace mip {
     
     std::shared_ptr<IMesh> getGlobalQuad() {return m_globQuad;} //for 2D optimization
     
-    virtual std::shared_ptr<IMesh> createMesh(const MeshData& data) = 0; //from model
-    virtual std::shared_ptr<ITexture> createTexture(const std::string& path, const bool flip) = 0; //from model
-    virtual std::shared_ptr<IMaterial> createMaterial(const std::string& vertShaderPath, const std::string& fragShaderPath = "") = 0; //from model
+    virtual std::shared_ptr<IMesh> createMesh(const MeshData& data) = 0;
+    virtual std::shared_ptr<ITexture> createTexture(const std::string& path, const bool flip) = 0;
+    virtual std::shared_ptr<IMaterial> createMaterial(const std::string& vertShaderPath, const std::string& fragShaderPath = "") = 0;
     
     virtual bool beginFrame(const CameraInfo& camera) = 0;
     virtual bool submit(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform) = 0;
     // virtual bool submitAnimated(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform, const std::vector<glm::mat4>& boneTransforms) = 0;
+    
     virtual bool endFrame() = 0;
     
     RendererType getType() { return renderer_type; }

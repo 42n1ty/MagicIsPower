@@ -2,7 +2,7 @@
 
 #include "window.hpp"
 #include "../graphics/i_renderer.hpp"
-#include "../graphics/sprite.hpp"
+#include "../common/ecs_core.hpp"
 #include <chrono>
 
 namespace mip {
@@ -22,7 +22,7 @@ namespace mip {
     
     //and then resources
     // std::unique_ptr<Model> m_model{nullptr};
-    std::unique_ptr<Sprite> m_sprite = nullptr;
+    std::unique_ptr<ecs::Manager> m_mang = nullptr;
     
     void processInput(GLFWwindow* wnd, const float dT);
     

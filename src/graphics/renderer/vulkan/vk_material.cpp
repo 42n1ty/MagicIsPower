@@ -18,9 +18,19 @@ namespace mip {
     m_lDev = &lDev;
     
     std::array<vk::DescriptorSetLayout, 2> setLayouts = {perFrameLayout, perMaterialLayout};
+    
+    vk::PushConstantRange pcRange{
+      .stageFlags = vk::ShaderStageFlagBits::eVertex,
+      .offset = 0,
+      .size = sizeof(glm::mat4)
+    };
+    
     vk::PipelineLayoutCreateInfo plInfo{
       .setLayoutCount = setLayouts.size(),
-      .pSetLayouts = setLayouts.data()
+      .pSetLayouts = setLayouts.data(),
+      
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &pcRange
     };
     
     if(!m_pipeline.init(lDev, sc, plInfo, depthFormat, config)) {

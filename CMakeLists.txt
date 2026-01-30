@@ -17,12 +17,12 @@ function (add_slang_shader_target TARGET)
   cmake_parse_arguments ("SHADER" "" "" "SOURCES" ${ARGN})
 
   set(OUTPUT_SHADER_NAME "shader.spv")
-  set(SHADERS_SRC_DIR ${CMAKE_CURRENT_LIST_DIR}/src/shaders)
-  set(SHADERS_OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR}/assets/shaders)
+  set(SHADERS_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders)
+  set(SHADERS_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders)
   set(FINAL_SHADER_PATH ${SHADERS_OUTPUT_DIR}/${OUTPUT_SHADER_NAME})
   set(ENTRY_POINTS -entry vertMain -entry fragMain)
 
-  file(MAKE_DIRECTORY ${SHADERS_OUTPUT_DIR})
+  # file(MAKE_DIRECTORY ${SHADERS_OUTPUT_DIR})
 # -fvk-b-shift 0 0 -fvk-t-shift 0 0 -fvk-s-shift 0 0 
   add_custom_command(
     OUTPUT  ${FINAL_SHADER_PATH}

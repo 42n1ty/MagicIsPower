@@ -249,11 +249,19 @@ namespace mip {
     auto vkMaterial = std::static_pointer_cast<VulkanMaterial>(material);
     
     ObjectData objData{.model = transform};
-    m_objectUBO.update(objData, m_curFrame);
+    // m_objectUBO.update(objData, m_curFrame);
     
     vkMaterial->bind(*m_curCmdBuf);
     
     m_curCmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, vkMaterial->getPipLayout(), 0, *(m_perFrameDescSets[m_curFrame]), nullptr);
+    vk::PushConstantsInfo pcInfo{
+      .layout = vkMaterial->getPipLayout(),
+      .stageFlags = vk::ShaderStageFlagBits::eVertex,
+      .offset = 0,
+      .size = sizeof(glm::mat4),
+      .pValues = &transform
+    };
+    m_curCmdBuf->pushConstants2(pcInfo);
     
     vkMesh->bind(*m_curCmdBuf);
     
@@ -670,7 +678,7 @@ namespace mip {
   
   bool VulkanRenderer::createDescSetLayouts() {
     // set=0
-    std::array<vk::DescriptorSetLayoutBinding, 2> perFrameBindings = {
+    std::array<vk::DescriptorSetLayoutBinding, 1> perFrameBindings = {
       // binding 0: camera ubo
       vk::DescriptorSetLayoutBinding{
         .binding = 0,
@@ -680,13 +688,13 @@ namespace mip {
         .pImmutableSamplers = nullptr
       },
       // binding 2: object ubo
-      vk::DescriptorSetLayoutBinding{
-        .binding = 2,
-        .descriptorType = vk::DescriptorType::eUniformBuffer,
-        .descriptorCount = 1,
-        .stageFlags = vk::ShaderStageFlagBits::eVertex,
-        .pImmutableSamplers = nullptr
-      },
+      // vk::DescriptorSetLayoutBinding{
+      //   .binding = 2,
+      //   .descriptorType = vk::DescriptorType::eUniformBuffer,
+      //   .descriptorCount = 1,
+      //   .stageFlags = vk::ShaderStageFlagBits::eVertex,
+      //   .pImmutableSamplers = nullptr
+      // },
       // binding 3: bones ubo
       // vk::DescriptorSetLayoutBinding{
       //   .binding = 3,
@@ -764,10 +772,10 @@ namespace mip {
       Logger::error("Failed to init camera ubo");
       return false;
     }
-    if(!m_objectUBO.init(m_physDev, m_logDev)) {
-      Logger::error("Failed to init camera ubo");
-      return false;
-    }
+    // if(!m_objectUBO.init(m_physDev, m_logDev)) {
+    //   Logger::error("Failed to init camera ubo");
+    //   return false;
+    // }
     // if(!m_bonesUBO.init(m_physDev, m_logDev)) {
     //   Logger::error("Failed to init camera ubo");
     //   return false;
@@ -856,11 +864,11 @@ namespace mip {
         .offset = 0,
         .range = sizeof(CameraData)
       };
-      vk::DescriptorBufferInfo objectBufInfo{ // binding 2
-        .buffer = m_objectUBO.getUBufs()[i],
-        .offset = 0,
-        .range = sizeof(ObjectData)
-      };
+      // vk::DescriptorBufferInfo objectBufInfo{ // binding 2
+      //   .buffer = m_objectUBO.getUBufs()[i],
+      //   .offset = 0,
+      //   .range = sizeof(ObjectData)
+      // };
       // vk::DescriptorBufferInfo bonesBufInfo{ // binding 3
       //   .buffer = m_bonesUBO.getUBufs()[i],
       //   .offset = 0,
@@ -868,7 +876,7 @@ namespace mip {
       // };
       
       
-      std::array<vk::WriteDescriptorSet, 2> descWrites = {
+      std::array<vk::WriteDescriptorSet, 1> descWrites = {
         vk::WriteDescriptorSet {
           .dstSet = m_perFrameDescSets[i],
           .dstBinding = 0, // binding 0
@@ -878,15 +886,15 @@ namespace mip {
           .pImageInfo = nullptr,
           .pBufferInfo = &cameraBufInfo
         },
-        vk::WriteDescriptorSet {
-          .dstSet = m_perFrameDescSets[i],
-          .dstBinding = 2, // binding 2
-          .dstArrayElement = 0,
-          .descriptorCount = 1,
-          .descriptorType = vk::DescriptorType::eUniformBuffer,
-          .pImageInfo = nullptr,
-          .pBufferInfo = &objectBufInfo
-        },
+        // vk::WriteDescriptorSet {
+        //   .dstSet = m_perFrameDescSets[i],
+        //   .dstBinding = 2, // binding 2
+        //   .dstArrayElement = 0,
+        //   .descriptorCount = 1,
+        //   .descriptorType = vk::DescriptorType::eUniformBuffer,
+        //   .pImageInfo = nullptr,
+        //   .pBufferInfo = &objectBufInfo
+        // },
         // vk::WriteDescriptorSet {
         //   .dstSet = m_perFrameDescSets[i],
         //   .dstBinding = 3, // binding 3
