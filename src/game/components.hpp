@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include "../common/ecs_core.hpp"
+#include "../common/task.hpp"
 #include "../graphics/i_texture.hpp"
 #include "../graphics/i_mesh.hpp"
 #include "../graphics/i_material.hpp"
@@ -28,5 +29,11 @@ namespace game {
   };
   
   struct PlayerTag {};
+  
+  struct Script {
+    Task task;
+    float timer = 0.f;
+    bool active = true;
+  };
   
 }; //game

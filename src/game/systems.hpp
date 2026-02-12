@@ -107,4 +107,29 @@ namespace game {
     }
   };
   
+  class PatrolSystem : public ecs::ISystem {
+  public:
+    void update(ecs::Manager& manager, const float dT) override {
+      auto& scripts = manager.view<Script>();
+      
+      for(ecs::EntID e : scripts.getOwners()) {
+        auto* scr = scripts.get(e);
+        if(!scr->active || !scr->task.handle) continue;
+        
+        scr->timer -= dT;
+        
+        if(scr->timer <= 0.f) {
+          bool running = scr->task.resume();
+          
+          if(running) {
+            scr->timer = scr->task.handle.promise().waitTime;
+          }
+          else {
+            scr->active = false;
+          }
+        }
+      }
+    }
+  };
+  
 }; //game

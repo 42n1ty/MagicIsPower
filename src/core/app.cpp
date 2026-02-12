@@ -4,6 +4,7 @@
 #include "../game/components.hpp"
 #include "../game/loaders.hpp"
 #include "../game/systems.hpp"
+#include "../game/mob_logic.hpp"
 
 namespace mip {
   
@@ -39,6 +40,7 @@ namespace mip {
     m_mang->registerComponent<game::Transform>();
     m_mang->registerComponent<game::Sprite>();
     m_mang->registerComponent<game::Velocity>();
+    m_mang->registerComponent<game::Script>();
     m_mang->registerComponent<game::PlayerTag>();
     
     // 2. Loaders + Assets
@@ -47,6 +49,7 @@ namespace mip {
     
     // 3. Systems
     m_mang->registerSystem<game::PlayerControllerSystem>(m_Window->getWindow());
+    m_mang->registerSystem<game::PatrolSystem>();
     m_mang->registerSystem<game::MovementSystem>();
     m_mang->registerSystem<game::RenderSystem>(m_renderer.get());
     
@@ -72,15 +75,19 @@ namespace mip {
       .material = mapMat
     });
     
+    
+    
     auto player = m_mang->createEntity();
-    m_mang->addComponent(player, game::PlayerTag{});
-    m_mang->addComponent(player, game::Velocity{});
+    // m_mang->addComponent(player, game::PlayerTag{});
     m_mang->addComponent(player, game::Transform{
-      .pos = {m_Window->m_Width / 2, m_Window->m_Height / 2},
+      .pos = {m_Window->m_Width / 4, m_Window->m_Height / 4},
       .scale = {250, 250},
       .rot = 0.f,
       .z = 1
     });
+    auto& v = m_mang->addComponent(player, game::Velocity{});
+    m_mang->addComponent(player, game::Script{.task = game::squarePatrol(*m_mang, player, 2.f, 3.f, 150.f)});
+    
     texHandle = m_mang->loadAsset<std::shared_ptr<ITexture>>("../../assets/textures/txtr.jpg");
     auto playerMat = m_renderer->createMaterial("../../assets/shaders/shader.spv");
     if(!playerMat) {
