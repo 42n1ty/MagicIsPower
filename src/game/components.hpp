@@ -4,6 +4,7 @@
 #include "../common/ecs_core.hpp"
 #include "../graphics/i_texture.hpp"
 #include "../graphics/i_mesh.hpp"
+#include "../graphics/i_material.hpp"
 
 
 namespace game {
@@ -21,5 +22,11 @@ namespace game {
     std::shared_ptr<mip::IMaterial> material;
     glm::vec4 clr{1.f, 1.f, 1.f, 1.f};
   };
+  
+  struct Velocity {
+    glm::vec2 vel = {0.f, 0.f};
+  };
+  
+  struct PlayerTag {};
   
 }; //game

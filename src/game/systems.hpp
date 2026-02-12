@@ -25,7 +25,7 @@ namespace game {
       rendQ.reserve(100);
     }
     
-    void update(ecs::Manager& manager, float dT) override {
+    void update(ecs::Manager& manager, const float dT) override {
       rendQ.clear();
       auto& sprites = manager.view<Sprite>();
       auto& ts = manager.view<Transform>();
@@ -53,6 +53,57 @@ namespace game {
         renderer->submit(spr->mesh, spr->material, model);
       }
       
+    }
+  };
+  
+  class MovementSystem : public ecs::ISystem {
+    
+  public:
+    MovementSystem() {}
+    
+    void update(ecs::Manager& manager, const float dT) override {
+      auto& sonics = manager.view<Velocity>();
+      auto& ts = manager.view<Transform>();
+      
+      for(ecs::EntID e : sonics.getOwners()) {
+        auto* t = ts.get(e);
+        if(!t) continue;
+        
+        auto* vel = sonics.get(e);
+        t->pos += vel->vel * dT;
+      }
+      
+    }
+  };
+  
+  class PlayerControllerSystem : public ecs::ISystem {
+    GLFWwindow* wnd;
+    float speed = 300.f;
+    
+  public:
+    PlayerControllerSystem(GLFWwindow* wnd) : wnd(wnd) {}
+    
+    void update(ecs::Manager& manager, const float dT) override{
+      auto& vs = manager.view<Velocity>();
+      auto& ps = manager.view<PlayerTag>();
+      
+      for(ecs::EntID e : ps.getOwners()) {
+        auto* vel = vs.get(e);
+        if(!vel) continue;
+        
+        glm::vec2 moveDir{0.f, 0.f};
+        
+        if (glfwGetKey(wnd, GLFW_KEY_W) == GLFW_PRESS) moveDir.y -= 1.f;
+        if (glfwGetKey(wnd, GLFW_KEY_S) == GLFW_PRESS) moveDir.y += 1.f;
+        if (glfwGetKey(wnd, GLFW_KEY_A) == GLFW_PRESS) moveDir.x -= 1.f;
+        if (glfwGetKey(wnd, GLFW_KEY_D) == GLFW_PRESS) moveDir.x += 1.f;
+        
+        if(glm::length(moveDir) > 0.f) {
+          moveDir = glm::normalize(moveDir);
+        }
+        
+        vel->vel = moveDir * speed;
+      }
     }
   };
   

@@ -61,7 +61,7 @@ namespace ecs {
 
   struct ISystem {
     virtual ~ISystem() = default;
-    virtual void update(Manager& ecs, float dt) = 0;
+    virtual void update(Manager& ecs, const float dt) = 0;
   };
   
   

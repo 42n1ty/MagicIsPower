@@ -20,13 +20,11 @@ namespace mip {
     Logger::info("Application initializing...");
     
     // renderer==================================================
-    // m_renderer = std::make_unique<VulkanRenderer>();
-    // m_renderer->setType(RendererType::VK);
     m_renderer = std::make_unique<VulkanRenderer>();
     m_renderer->setType(RendererType::VK);
     
     // WINDOW==================================================
-    m_Window = std::make_unique<Window>(m_renderer->getType(), 1280, 720, "Magic is Power", false);
+    m_Window = std::make_unique<Window>(m_renderer->getType(), 1280, 720, "Magic is Power", true);
     // WINDOW==================================================
     
     if(!m_renderer->init(*m_Window)) {
@@ -34,26 +32,22 @@ namespace mip {
     }
     // renderer==================================================
     
-    // model==================================================
-    // m_model = std::make_unique<Model>(false); //this chest needn't flip vertically (I forgot why it was flipped in prev versions)
-    // if(!m_model->load(m_renderer.get(), "../../assets/models/chest/source/MESH_Chest.fbx")) {
-    //   Logger::error("Failed to load model");
-    //   return false;
-    // }
-    // model==================================================
-    
     // scene==================================================
     m_mang = std::make_unique<ecs::Manager>();
     
     // 1. Components
     m_mang->registerComponent<game::Transform>();
     m_mang->registerComponent<game::Sprite>();
+    m_mang->registerComponent<game::Velocity>();
+    m_mang->registerComponent<game::PlayerTag>();
     
     // 2. Loaders + Assets
     game::TextureLoader tLoader{m_renderer.get()};
     m_mang->registerAsset<std::shared_ptr<ITexture>>(tLoader);
     
     // 3. Systems
+    m_mang->registerSystem<game::PlayerControllerSystem>(m_Window->getWindow());
+    m_mang->registerSystem<game::MovementSystem>();
     m_mang->registerSystem<game::RenderSystem>(m_renderer.get());
     
     // 4. Entities
@@ -79,6 +73,8 @@ namespace mip {
     });
     
     auto player = m_mang->createEntity();
+    m_mang->addComponent(player, game::PlayerTag{});
+    m_mang->addComponent(player, game::Velocity{});
     m_mang->addComponent(player, game::Transform{
       .pos = {m_Window->m_Width / 2, m_Window->m_Height / 2},
       .scale = {250, 250},
@@ -103,6 +99,7 @@ namespace mip {
     Logger::info("Application initialized successfully");
     return true;
   }
+  
   
   void Application::run() {
     Logger::info("Entering main loop...");
