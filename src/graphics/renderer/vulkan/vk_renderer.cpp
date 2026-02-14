@@ -120,6 +120,7 @@ namespace mip {
     VulkanPplConfig materialConfig{};
     materialConfig.shaderPath = vertShaderPath;//"../../assets/shaders/shader.spv";
     materialConfig.cullMode = vk::CullModeFlagBits::eNone;
+    materialConfig.alphaBlend = true;
     materialConfig.depthTestEnable = false;
     materialConfig.depthWriteEnable = false;
     vk::Format depthFormat = vk::Format::eUndefined;

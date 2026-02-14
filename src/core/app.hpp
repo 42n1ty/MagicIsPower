@@ -2,7 +2,7 @@
 
 #include "window.hpp"
 #include "../graphics/i_renderer.hpp"
-#include "../common/ecs_core.hpp"
+#include "../game/scene.hpp"
 #include <chrono>
 
 namespace mip {
@@ -16,13 +16,10 @@ namespace mip {
 
   private:
     
-    //systems first
     std::unique_ptr<Window> m_Window = nullptr;
     std::unique_ptr<IRenderer> m_renderer = nullptr;
     
-    //and then resources
-    // std::unique_ptr<Model> m_model{nullptr};
-    std::unique_ptr<ecs::Manager> m_mang = nullptr;
+    std::unique_ptr<game::Scene> m_scene = nullptr;
     
     void processInput(GLFWwindow* wnd, const float dT);
     

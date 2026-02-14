@@ -1,10 +1,6 @@
 #include "app.hpp"
 #include "../common/logger.hpp"
 #include "../graphics/renderer/vulkan/vk_renderer.hpp"
-#include "../game/components.hpp"
-#include "../game/loaders.hpp"
-#include "../game/systems.hpp"
-#include "../game/mob_logic.hpp"
 
 namespace mip {
   
@@ -34,73 +30,15 @@ namespace mip {
     // renderer==================================================
     
     // scene==================================================
-    m_mang = std::make_unique<ecs::Manager>();
+    m_scene = std::make_unique<game::Scene>();
+    if(!m_scene->init(m_Window->getWindow(), m_renderer.get())) return false;
     
-    // 1. Components
-    m_mang->registerComponent<game::Transform>();
-    m_mang->registerComponent<game::Sprite>();
-    m_mang->registerComponent<game::Velocity>();
-    m_mang->registerComponent<game::Script>();
-    m_mang->registerComponent<game::PlayerTag>();
-    
-    // 2. Loaders + Assets
-    game::TextureLoader tLoader{m_renderer.get()};
-    m_mang->registerAsset<std::shared_ptr<ITexture>>(tLoader);
-    
-    // 3. Systems
-    m_mang->registerSystem<game::PlayerControllerSystem>(m_Window->getWindow());
-    m_mang->registerSystem<game::PatrolSystem>();
-    m_mang->registerSystem<game::MovementSystem>();
-    m_mang->registerSystem<game::RenderSystem>(m_renderer.get());
-    
-    // 4. Entities
-    auto map = m_mang->createEntity();
-    m_mang->addComponent(map, game::Transform{
-      .pos = {m_Window->m_Width / 2, m_Window->m_Height / 2},
-      .scale = {m_Window->m_Width, m_Window->m_Height},
-      .rot = 0.f,
-      .z = 0
-    });
-    auto texHandle = m_mang->loadAsset<std::shared_ptr<ITexture>>("../../assets/textures/1.png");
-    auto mapMat = m_renderer->createMaterial("../../assets/shaders/shader.spv");
-    if(!mapMat) {
-      Logger::error("Failed to create material for sprite!");
-      return false;
-    }
-    if (auto tex = m_mang->getAsset(texHandle)) {
-      mapMat->setTexture(0, *tex);
-    }
-    m_mang->addComponent(map, game::Sprite{
-      .mesh = m_renderer->getGlobalQuad(),
-      .material = mapMat
-    });
-    
-    
-    
-    auto player = m_mang->createEntity();
-    // m_mang->addComponent(player, game::PlayerTag{});
-    m_mang->addComponent(player, game::Transform{
-      .pos = {m_Window->m_Width / 4, m_Window->m_Height / 4},
-      .scale = {250, 250},
-      .rot = 0.f,
-      .z = 1
-    });
-    auto& v = m_mang->addComponent(player, game::Velocity{});
-    m_mang->addComponent(player, game::Script{.task = game::squarePatrol(*m_mang, player, 2.f, 3.f, 150.f)});
-    
-    texHandle = m_mang->loadAsset<std::shared_ptr<ITexture>>("../../assets/textures/txtr.jpg");
-    auto playerMat = m_renderer->createMaterial("../../assets/shaders/shader.spv");
-    if(!playerMat) {
-      Logger::error("Failed to create material for sprite!");
-      return false;
-    }
-    if (auto tex = m_mang->getAsset(texHandle)) {
-      playerMat->setTexture(0, *tex);
-    }
-    m_mang->addComponent(player, game::Sprite{
-      .mesh = m_renderer->getGlobalQuad(),
-      .material = playerMat
-    });
+    if(
+         !m_scene->createLevel(m_Window->m_Width, m_Window->m_Height, m_renderer.get(), "../../assets/textures/map.png")
+      || !m_scene->createPlayer(m_Window->m_Width / 3, m_Window->m_Height / 3, m_renderer.get(), "../../assets/textures/player1.png")
+      || !m_scene->createMobs(m_Window->m_Width / 3, m_Window->m_Height / 3, m_renderer.get(), "../../assets/textures/mob1.png")
+      
+    ) return false;   
     // scene==================================================
     
     Logger::info("Application initialized successfully");
@@ -127,7 +65,7 @@ namespace mip {
       
       if(!m_renderer->beginFrame(camData)) break;
       
-      m_mang->update(deltaTime);
+      m_scene->update(deltaTime);
       
       if(!m_renderer->endFrame()) break;
       

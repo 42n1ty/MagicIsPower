@@ -28,22 +28,30 @@ public:
   
   template<typename... Args>
   static void info(fmt::format_string<Args...> fmt_str, Args&&... args) {
+    #ifndef NDEBUG
       log(fmt::color::aquamarine, "INFO", fmt_str, std::forward<Args>(args)...);
+    #endif
   }
   
   template<typename... Args>
   static void warn(fmt::format_string<Args...> fmt_str, Args&&... args) {
+    #ifndef NDEBUG
       log(fmt::color::light_yellow, "WARN", fmt_str, std::forward<Args>(args)...);
+    #endif
   }
   
   template<typename... Args>
   static void error(fmt::format_string<Args...> fmt_str, Args&&... args) {
+    #ifndef NDEBUG
       log(fmt::color::red, "ERROR", fmt_str, std::forward<Args>(args)...);
+    #endif
   }
   
   template<typename... Args>
   static void debug(fmt::format_string<Args...> fmt_str, Args&&... args) {
+    #ifndef NDEBUG
       log(fmt::color::light_green, "DEBUG", fmt_str, std::forward<Args>(args)...);
+    #endif
   }
   
 private:
