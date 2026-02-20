@@ -26,6 +26,10 @@ struct fmt::formatter<std::thread::id> {
 class Logger {
 public:
   
+  Logger() {
+    
+  }
+  
   template<typename... Args>
   static void info(fmt::format_string<Args...> fmt_str, Args&&... args) {
     #ifndef NDEBUG

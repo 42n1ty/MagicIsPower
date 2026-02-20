@@ -85,7 +85,15 @@ namespace mip {
         lDev
       )) return false;
       
-      void* dataStaging = stagingBufMem.mapMemory(0, bufSize);
+      void* dataStaging = nullptr;
+      {
+        auto res = stagingBufMem.mapMemory(0, bufSize);
+        if(!res.has_value()) {
+          Logger::error("Failed to map buffer memory: {}", vk::to_string(res.result));
+          return false;
+        }
+        dataStaging = std::move(*res);
+      }
       memcpy(dataStaging, verts.data(), bufSize);
       stagingBufMem.unmapMemory();
       
@@ -124,7 +132,15 @@ namespace mip {
         lDev
       )) return false;
       
-      void* data = stagingBufMem.mapMemory(0, bufSize);
+      void* data = nullptr;
+      {
+        auto res = stagingBufMem.mapMemory(0, bufSize);
+        if(!res.has_value()) {
+          Logger::error("Failed to map buffer memory: {}", vk::to_string(res.result));
+          return false;
+        }
+        data = std::move(*res);
+      }
       memcpy(data, inds.data(), bufSize);
       stagingBufMem.unmapMemory();
       

@@ -56,11 +56,11 @@ namespace mip {
     };
     
     auto res = dev.createShaderModule(createInfo);
-    if(!res) {
-      Logger::error("Failed to create shader module: {}", vk::to_string(res.error()));
+    if(!res.has_value()) {
+      Logger::error("Failed to create shader module: {}", vk::to_string(res.result));
       return std::nullopt;
     }
-    auto shaderModule = std::move(res.value());
+    auto shaderModule = std::move(*res);
     
     return shaderModule;
   }
@@ -184,11 +184,11 @@ namespace mip {
     
     {
       auto res = logDev.createPipelineLayout(info);
-      if(!res) {
-        Logger::error("Failed to create pipeline layout: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to create pipeline layout: {}", vk::to_string(res.result));
         return false;
       }
-      m_pipelineLayout = std::move(res.value());
+      m_pipelineLayout = std::move(*res);
     }
     
     vk::PipelineRenderingCreateInfo pipRenderCreateInfo{
@@ -216,11 +216,11 @@ namespace mip {
       
     {
       auto res = logDev.createGraphicsPipeline(nullptr, pipInfo);
-      if(!res) {
-        Logger::error("Failed to create graphics pipeline: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to create graphics pipeline: {}", vk::to_string(res.result));
         return false;
       }
-      m_pipeline = std::move(res.value());
+      m_pipeline = std::move(*res);
     }
     
     return true;

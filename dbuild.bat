@@ -1,5 +1,5 @@
 md build
-cmake -B build -G "Visual Studio 18 2026" -DCMAKE_TOOLCHAIN_FILE="C:\Progs\vcpkg\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCMAKE_BUILD_TYPE=Debug
+cmake -B build -G "Visual Studio 18 2026" -DCMAKE_TOOLCHAIN_FILE="C:\Users\lmnt1x\Progs\vcpkg\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCMAKE_BUILD_TYPE=Debug
 @REM cmake -B build ^
   @REM -G "Ninja" ^
   @REM -DCMAKE_C_COMPILER=clang-cl.exe ^

@@ -57,7 +57,16 @@ namespace mip {
         
         m_uniformBufs.emplace_back(std::move(buf));
         m_uniformBufsMem.emplace_back(std::move(bufMem));
-        m_uniformBufsMapped.emplace_back(m_uniformBufsMem[i].mapMemory(0, bufSize));
+        void* mappedMem = nullptr;
+        {
+          auto res = m_uniformBufsMem[i].mapMemory(0, bufSize);
+          if(!res.has_value()) {
+            Logger::error("Failed to map uniform buffer memory: {}", vk::to_string(res.result));
+            return false;
+          }
+          mappedMem = std::move(*res);
+        }
+        m_uniformBufsMapped.emplace_back(mappedMem);
       }
       
       return true;

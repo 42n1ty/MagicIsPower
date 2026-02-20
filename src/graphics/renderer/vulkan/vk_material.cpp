@@ -45,11 +45,11 @@ namespace mip {
     };
     
     auto res = lDev.allocateDescriptorSets(allocInfo);
-    if(!res) {
-      Logger::error("Failed to allocate material descriptor set: {}", vk::to_string(res.error()));
+    if(!res.has_value()) {
+      Logger::error("Failed to allocate material descriptor set: {}", vk::to_string(res.result));
       return false;
     }
-    m_descSet = std::move(res.value()[0]);
+    m_descSet = std::move(res.value[0]);
     
     return true;
   }

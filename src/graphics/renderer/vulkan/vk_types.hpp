@@ -5,6 +5,7 @@
 #define NOMINMAX
 #include <memory>
 #include <optional>
+#include <expected>
 #include <string>
 #include <vector>
 #include <span>

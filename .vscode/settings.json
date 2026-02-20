@@ -1,11 +1,14 @@
 {
 	"C_Cpp.default.includePath": [
-		"C:\\Progs\\vcpkg\\installed\\x64-windows\\include",
-		"C:\\Progs\\Vulkan\\Include\\",
-		"C:\\Progs\\vcpkg\\packages\\vk-bootstrap_x64-windows-static-md\\include",
-		"C:\\Progs\\vcpkg\\packages\\vulkan-memory-allocator_x64-windows-static-md\\include",
-		"C:\\Progs\\vcpkg\\packages\\stb_x64-windows-static-md\\include",
-		"C:\\Progs\\vcpkg\\packages\\glad_x64-windows-static-md\\include",
+		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\installed\\x64-windows\\include",
+		"C:\\Users\\lmnt1x\\Progs\\Vulkan\\Include\\",
+		// "C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\vk-bootstrap_x64-windows-static-md\\include",
+		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\glm_x64-windows-static-md\\include",
+		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\glfw3_x64-windows-static-md\\include",
+		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\fmt_x64-windows-static-md\\include",
+		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\vulkan-memory-allocator_x64-windows-static-md\\include",
+		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\stb_x64-windows-static-md\\include",
+		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\glad_x64-windows-static-md\\include",
 	],
 	"files.associations": {
     "chrono": "cpp",
@@ -112,7 +115,7 @@
   },
 	"C_Cpp.errorSquiggles": "enabled",
   "cmake.configureSettings": {
-        "CMAKE_TOOLCHAIN_FILE": "C:/Progs/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        "CMAKE_TOOLCHAIN_FILE": "C:/Users/lmnt1x/Progs/vcpkg/scripts/buildsystems/vcpkg.cmake"
   },
   "C_Cpp.default.compilerPath": "cl.exe",
   // "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"

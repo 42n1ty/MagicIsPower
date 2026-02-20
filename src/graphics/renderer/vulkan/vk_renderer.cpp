@@ -145,16 +145,16 @@ namespace mip {
     }
     
     auto res = m_sc.getSC().acquireNextImage(UINT64_MAX, *m_presCompleteSems[m_curFrame], nullptr);
-    if(res.first == vk::Result::eErrorOutOfDateKHR) {
+    if(res.result == vk::Result::eErrorOutOfDateKHR) {
       Logger::debug("Window's size has been changed: recreating swapchain");
       framebufferResized = true;
       return true;
     }
-    if(res.first != vk::Result::eSuccess && res.first != vk::Result::eSuboptimalKHR) {
+    if(res.result != vk::Result::eSuccess && res.result != vk::Result::eSuboptimalKHR) {
       Logger::debug("failed to acqure swapchain image!");
       return false;
     }
-    m_curImgIndex = res.second;
+    m_curImgIndex = res.value;
     
     if (m_imagesInFlight[m_curImgIndex] != nullptr) {
       (void)m_logDev.waitForFences({m_imagesInFlight[m_curImgIndex]}, vk::True, UINT64_MAX);
@@ -170,18 +170,23 @@ namespace mip {
     // cameraData.proj[1][1] *= -1; // reverse, only for 3D
     m_cameraUBO.update(cameraData, m_curFrame);
     
-    transitionImageLayout(
-      m_logDev,
-      m_cmdPool,
-      m_graphQ,
-      m_sc.getImgs()[m_curImgIndex],
-      vk::ImageLayout::eUndefined,
-      vk::ImageLayout::eColorAttachmentOptimal,
-      {},
-      vk::AccessFlagBits2::eColorAttachmentWrite,
-      vk::PipelineStageFlagBits2::eTopOfPipe,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput
-    );
+    vk::ImageMemoryBarrier2 imgBarrier {
+      .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      .srcAccessMask = {},
+      .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+      .oldLayout = vk::ImageLayout::eUndefined,
+      .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .image = m_sc.getImgs()[m_curImgIndex],
+      .subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+    };
+    vk::DependencyInfo depInfo {
+      .imageMemoryBarrierCount = 1,
+      .pImageMemoryBarriers = &imgBarrier
+    };
+    m_curCmdBuf->pipelineBarrier2(depInfo);
     
     // vk::ImageMemoryBarrier2 depthBarrier{
     //   .srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
@@ -238,7 +243,17 @@ namespace mip {
     
     m_cmdBufs[m_curFrame].beginRendering(renderingInfo);
     
-    m_cmdBufs[m_curFrame].setViewport(0, vk::Viewport(0.f, 0.f, static_cast<float>(m_sc.getExtent().width), static_cast<float>(m_sc.getExtent().height), 0.f, 1.f));
+    vk::Viewport viewport;
+    viewport.x = 0.0f;
+    // Смещаем начальную точку вниз (на высоту экрана)
+    viewport.y = static_cast<float>(m_sc.getExtent().height); 
+    viewport.width = static_cast<float>(m_sc.getExtent().width);
+    // Делаем высоту отрицательной, чтобы Вулкан рендерил снизу вверх!
+    viewport.height = -static_cast<float>(m_sc.getExtent().height); 
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    m_cmdBufs[m_curFrame].setViewport(0, viewport);
+    // m_cmdBufs[m_curFrame].setViewport(0, vk::Viewport(0.f, 0.f, static_cast<float>(m_sc.getExtent().width), static_cast<float>(m_sc.getExtent().height), 0.f, 1.f));
     m_cmdBufs[m_curFrame].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), m_sc.getExtent()));
     
     
@@ -298,18 +313,24 @@ namespace mip {
   bool VulkanRenderer::endFrame() {
     m_curCmdBuf->endRendering();
     
-    transitionImageLayout(
-      m_logDev,
-      m_cmdPool,
-      m_graphQ,
-      m_sc.getImgs()[m_curImgIndex],
-      vk::ImageLayout::eColorAttachmentOptimal,
-      vk::ImageLayout::ePresentSrcKHR,
-      vk::AccessFlagBits2::eColorAttachmentWrite,
-      {},
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::PipelineStageFlagBits2::eBottomOfPipe
-    );
+    vk::ImageMemoryBarrier2 imgBarrier {
+    .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+    .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+    .dstStageMask = vk::PipelineStageFlagBits2::eBottomOfPipe,
+    .dstAccessMask = {},
+    .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+    .newLayout = vk::ImageLayout::ePresentSrcKHR,
+    .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+    .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+    .image = m_sc.getImgs()[m_curImgIndex],
+    .subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+    };
+    vk::DependencyInfo depInfo {
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &imgBarrier
+    };
+    m_curCmdBuf->pipelineBarrier2(depInfo);
+    
     
     m_curCmdBuf->end();
     
@@ -401,7 +422,17 @@ namespace mip {
     if(enableVaildLayers) {
       reqLayers.assign(m_validLayers.begin(), m_validLayers.end());
     }
-    auto layerProps = m_ctx.enumerateInstanceLayerProperties();
+    
+    std::vector<vk::LayerProperties> layerProps;
+    {
+      auto res = m_ctx.enumerateInstanceLayerProperties();
+      if(!res.has_value()) {
+        Logger::error("Failed to enumerate instance layer props: {}", vk::to_string(res.result));
+        return false;
+      }
+      layerProps = std::move(*res);
+    }
+    
     if(std::ranges::any_of(reqLayers, [&layerProps](auto const& reqLayer) {
       return std::ranges::none_of(layerProps, [reqLayer](auto const& layerProp) {
         return strcmp(layerProp.layerName, reqLayer) == 0;
@@ -412,7 +443,17 @@ namespace mip {
     }
     
     auto glfwExtensions = getReqExtensions();
-    auto extensionProps = m_ctx.enumerateInstanceExtensionProperties();
+    
+    std::vector<vk::ExtensionProperties> extensionProps;
+    {
+      auto res = m_ctx.enumerateInstanceExtensionProperties();
+      if(!res.has_value()) {
+        Logger::error("Failed to enumerate instance layer props: {}", vk::to_string(res.result));
+        return false;
+      }
+      extensionProps = std::move(*res);
+    }
+    
     for(auto const& ext :glfwExtensions) {
       if(std::ranges::none_of(extensionProps, [ext](auto const& extensionProp) {
         return strcmp(extensionProp.extensionName, ext) == 0;
@@ -431,12 +472,11 @@ namespace mip {
     };
     
     auto res = m_ctx.createInstance(createInfo);
-    if(res) {
-      m_inst = std::move(res.value());
+    if(res.has_value()) {
+      m_inst = std::move(*res);
     }
     else {
-      vk::Result errCode = res.error();
-      Logger::error("Failed to create instance: {}", vk::to_string(errCode));
+      Logger::error("Failed to create instance: {}", vk::to_string(res.result));
       return false;
     }
     
@@ -459,25 +499,24 @@ namespace mip {
       .messageType = mesTypeFlags,
       .pfnUserCallback = &debugCallback
     };
-    auto res = m_inst.createDebugUtilsMessengerEXT(createInfo);
-    if(res) {
-      m_debMesser = std::move(res.value());
-      return true;
-    }
-    else {
-      vk::Result errCode = res.error();
-      Logger::error("Failed to create debug messenger: {}", vk::to_string(errCode));
-      return false;
+    {
+      auto res = m_inst.createDebugUtilsMessengerEXT(createInfo);
+      if(!res.has_value()) {
+        Logger::error("Failed to create debug messenger: {}", vk::to_string(res.result));
+        return false;
+      }
+      m_debMesser = std::move(*res);
     }
     
+    return true;
   }
   
   bool VulkanRenderer::pickPhysDev() {
     
     auto res = m_inst.enumeratePhysicalDevices();
-    if(res) {
+    if(res.has_value()) {
       
-      std::vector<vk::raii::PhysicalDevice> devs = res.value();
+      std::vector<vk::raii::PhysicalDevice> devs = res.value;
       if(devs.empty()) {
         Logger::error("Failed to find GPUs with Vulkan support");
         return false;
@@ -494,7 +533,16 @@ namespace mip {
           );
           isSuitable = isSuitable && (qfpIter != queueFams.end());
           
-          auto extensions = dev.enumerateDeviceExtensionProperties();
+          std::vector<vk::ExtensionProperties> extensions;
+          {
+            auto res = dev.enumerateDeviceExtensionProperties();
+            if(!res.has_value()) {
+              Logger::error("Failed to enumerate device extension props: {}", vk::to_string(res.result));
+              return false;
+            }
+            extensions = std::move(*res);
+          }
+          
           bool found = true;
           for(auto const& ext : m_devExtensions) {
             auto extIter = std::ranges::find_if(extensions, [ext](auto const& extension) {return strcmp(extension.extensionName, ext) == 0;});
@@ -526,8 +574,7 @@ namespace mip {
       return true;
     }
     else {
-      vk::Result errCode = res.error();
-      Logger::error("Failed to enumerate physical devices: {}", vk::to_string(errCode));
+      Logger::error("Failed to enumerate physical devices: {}", vk::to_string(res.result));
       return false;
     }
   }
@@ -546,10 +593,13 @@ namespace mip {
     }
     
     m_graphQI = static_cast<uint32_t>(std::distance(qfProps.begin(), graphQFP));
-    m_presQI = m_physDev.getSurfaceSupportKHR(m_graphQI, *m_surf) ? m_graphQI : static_cast<uint32_t>(qfProps.size());
+    {
+      auto res = m_physDev.getSurfaceSupportKHR(m_graphQI, *m_surf);
+      m_presQI = res.has_value() ? m_graphQI : static_cast<uint32_t>(qfProps.size());
+    }
     if(m_presQI == qfProps.size()) {
       for(size_t i = 0; i < qfProps.size(); ++i) {
-        if((qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics) && m_physDev.getSurfaceSupportKHR(static_cast<uint32_t>(i), *m_surf)) {
+        if((qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics) && m_physDev.getSurfaceSupportKHR(static_cast<uint32_t>(i), *m_surf).has_value()) {
           m_graphQI = static_cast<uint32_t>(i);
           m_presQI = m_graphQI;
           break;
@@ -558,7 +608,7 @@ namespace mip {
       
       if(m_presQI == qfProps.size()) {
         for(size_t i = 0; i < qfProps.size(); ++i) {
-          if(m_physDev.getSurfaceSupportKHR(static_cast<uint32_t>(i), *m_surf)) {
+          if(m_physDev.getSurfaceSupportKHR(static_cast<uint32_t>(i), *m_surf).has_value()) {
             m_presQI = static_cast<uint32_t>(i);
             break;
           }
@@ -612,30 +662,15 @@ namespace mip {
     
     {
       auto res = m_physDev.createDevice(createInfo);
-      if(!res) {
-        Logger::error("Failed to create logical device: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to create logical device: {}", vk::to_string(res.result));
         return false;
       }
-      m_logDev = std::move(res.value());
+      m_logDev = std::move(*res);
     }
       
-    {
-      auto res = m_logDev.getQueue(m_graphQI, 0);
-      if(!res) {
-        Logger::error("Failed to get graphics queue: {}", vk::to_string(res.error()));
-        return false;
-      }
-      m_graphQ = res.value();
-    }
-      
-    {
-      auto res = m_logDev.getQueue(m_presQI, 0);
-      if(!res) {
-        Logger::error("Failed to get present queue: {}", vk::to_string(res.error()));
-        return false;
-      }
-      m_presQ = res.value();
-    }
+    m_graphQ = m_logDev.getQueue(m_graphQI, 0);
+    m_presQ  = m_logDev.getQueue(m_presQI, 0);
     
     return true;
   }
@@ -714,11 +749,11 @@ namespace mip {
     
     {
       auto res = m_logDev.createDescriptorSetLayout(perFrameLayoutInfo);
-      if(!res) {
-        Logger::error("Failed to create descriptor set layout: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to create descriptor set layout: {}", vk::to_string(res.result));
         return false;
       }
-      m_perFrameDescSetLayout = std::move(res.value());
+      m_perFrameDescSetLayout = std::move(*res);
     }
     
     // set=1
@@ -738,11 +773,11 @@ namespace mip {
     
     {
       auto res = m_logDev.createDescriptorSetLayout(materialLayoutInfo);
-      if(!res) {
-        Logger::error("Failed to create descriptor set layout: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to create descriptor set layout: {}", vk::to_string(res.result));
         return false;
       }
-      m_perMatDescSetLayout = std::move(res.value());
+      m_perMatDescSetLayout = std::move(*res);
     }
     
     return true;
@@ -757,11 +792,11 @@ namespace mip {
     
     {
       auto res = m_logDev.createCommandPool(poolInfo);
-      if(!res) {
-        Logger::error("Failed to create command pool: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to create command pool: {}", vk::to_string(res.result));
         return false;
       }
-      m_cmdPool = std::move(res.value());
+      m_cmdPool = std::move(*res);
     }
     
     return true;
@@ -830,11 +865,11 @@ namespace mip {
     
     {
       auto res = m_logDev.createDescriptorPool(poolInfo);
-      if(!res) {
-        Logger::error("Failed to create descriptor pool: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to create descriptor pool: {}", vk::to_string(res.result));
         return false;
       }
-      m_descPool = std::move(res.value());
+      m_descPool = std::move(*res);
     }
     
     return true;
@@ -852,11 +887,11 @@ namespace mip {
     m_perFrameDescSets.clear();
     {
       auto res = m_logDev.allocateDescriptorSets(allocInfo);
-      if(!res) {
-        Logger::error("Failed to allocate descriptor sets: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to allocate descriptor sets: {}", vk::to_string(res.result));
         return false;
       }
-      m_perFrameDescSets = std::move(res.value());
+      m_perFrameDescSets = std::move(*res);
     }
 
     for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
@@ -925,11 +960,11 @@ namespace mip {
     
     {
       auto res = m_logDev.allocateCommandBuffers(allocInfo);
-      if(!res) {
-        Logger::error("Failed to allocate command buffer: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to allocate command buffer: {}", vk::to_string(res.result));
         return false;
       }
-      m_cmdBufs = std::move(res.value());
+      m_cmdBufs = std::move(*res);
     }
     
     return true;
@@ -944,30 +979,30 @@ namespace mip {
     for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       {
         auto res = m_logDev.createSemaphore(vk::SemaphoreCreateInfo());
-        if(!res) {
-          Logger::error("Failed to create presentation semaphore: {}", vk::to_string(res.error()));
+        if(!res.has_value()) {
+          Logger::error("Failed to create presentation semaphore: {}", vk::to_string(res.result));
           return false;
         }
-        m_presCompleteSems.emplace_back(std::move(res.value()));
+        m_presCompleteSems.emplace_back(std::move(*res));
       }
       {
         auto res = m_logDev.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
-        if(!res) {
-          Logger::error("Failed to create draw fence: {}", vk::to_string(res.error()));
+        if(!res.has_value()) {
+          Logger::error("Failed to create draw fence: {}", vk::to_string(res.result));
           return false;
         }
-        m_inFlightFences.emplace_back(std::move(res.value()));
+        m_inFlightFences.emplace_back(std::move(*res));
       }
     }
     
     uint32_t imgCnt = m_sc.getImgs().size();
     for(uint32_t i = 0; i < imgCnt; ++i) {
       auto res = m_logDev.createSemaphore(vk::SemaphoreCreateInfo());
-      if(!res) {
-        Logger::error("Failed to create rendering semaphore: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to create rendering semaphore: {}", vk::to_string(res.result));
         return false;
       }
-      m_renderFinishedSems.emplace_back(std::move(res.value()));
+      m_renderFinishedSems.emplace_back(std::move(*res));
     }
     
     return true;

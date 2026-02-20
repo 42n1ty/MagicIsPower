@@ -10,15 +10,15 @@ namespace mip {
   void Window::framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
     if (self) {
-      self->m_Width = width;
-      self->m_Height = height;
+      self->m_width = width;
+      self->m_height = height;
       // glViewport(0, 0, width, height);
       Logger::info("Window resized to {}x{}", width, height);
     }
   }
 
   Window::Window(RendererType rType, int width, int height, const std::string& title, bool fullscreen)
-    : m_Width(width), m_Height(height), isFullscreen(fullscreen) {
+    : m_width(width), m_height(height), isFullscreen(fullscreen) {
     glfwSetErrorCallback(error_callback);
 
     if (!glfwInit()) {
@@ -41,34 +41,34 @@ namespace mip {
         isFullscreen = false;
         return;
       }
-      m_Width = mode->width;
-      m_Height = mode->height;
+      m_width = mode->width;
+      m_height = mode->height;
     }
     if(isFullscreen) glfwWindowHint(GLFW_DECORATED, GL_FALSE);
     
-    m_Window = glfwCreateWindow(m_Width, m_Height, title.c_str(), NULL, NULL);
+    m_window = glfwCreateWindow(m_width, m_height, title.c_str(), NULL, NULL);
     
-    if (!m_Window) {
+    if (!m_window) {
       glfwTerminate();
       Logger::error("Failed to create GLFW window!");
       return;
     }
 
-    glfwSetWindowUserPointer(m_Window, this);
+    glfwSetWindowUserPointer(m_window, this);
   }
 
   Window::~Window() {
-    glfwDestroyWindow(m_Window);
+    glfwDestroyWindow(m_window);
     glfwTerminate();
   }
 
   bool Window::shouldClose() const {
-    return glfwWindowShouldClose(m_Window);
+    return glfwWindowShouldClose(m_window);
   }
 
   float Window::getAspectRatio() const {
-    if (m_Height == 0) return 1.0f;
-    return static_cast<float>(m_Width) / static_cast<float>(m_Height);
+    if (m_height == 0) return 1.0f;
+    return static_cast<float>(m_width) / static_cast<float>(m_height);
   }
   
   void Window::pollEvents() {

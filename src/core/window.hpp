@@ -17,17 +17,17 @@ namespace mip {
     Window& operator=(const Window&) = delete;
 
     bool shouldClose() const;
-    void setShouldClose(bool flag) {glfwSetWindowShouldClose(m_Window, flag);}
-    GLFWwindow* getWindow() const { return m_Window; }
+    void setShouldClose(bool flag) {glfwSetWindowShouldClose(m_window, flag);}
+    GLFWwindow* getWindow() const { return m_window; }
     
     void pollEvents();
 
     float getAspectRatio() const;
-    int m_Width;
-    int m_Height;
+    int m_width;
+    int m_height;
 
   private:
-    GLFWwindow* m_Window;
+    GLFWwindow* m_window;
     bool isFullscreen;
 
     static void framebuffer_size_callback(GLFWwindow* window, int width, int height);

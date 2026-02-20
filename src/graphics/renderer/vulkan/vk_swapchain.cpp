@@ -59,12 +59,38 @@ namespace mip {
     const uint32_t gID,
     const uint32_t pID
   ) {
-    auto surfCapabs = physDev.getSurfaceCapabilitiesKHR(surf);
-    m_format = chooseSSF(physDev.getSurfaceFormatsKHR(surf));
+    vk::SurfaceCapabilitiesKHR surfCapabs;
+    {
+      auto res = physDev.getSurfaceCapabilitiesKHR(surf);
+      if(!res.has_value()) {
+        Logger::error("Failed to get surface capabs: {}", vk::to_string(res.result));
+        return false;
+      }
+      surfCapabs = std::move(*res);
+    }
+    std::vector<vk::SurfaceFormatKHR> surfaces;
+    {
+      auto res = physDev.getSurfaceFormatsKHR(surf);
+      if(!res.has_value()) {
+        Logger::error("Failed to get surface formats: {}", vk::to_string(res.result));
+        return false;
+      }
+      surfaces = std::move(*res);
+    }
+    m_format = chooseSSF(surfaces);
     m_extent = chooseSE(wnd, surfCapabs);
     auto minImgCnt = std::max(3u, surfCapabs.minImageCount);
     minImgCnt = (surfCapabs.maxImageCount > 0 && minImgCnt > surfCapabs.maxImageCount) ? surfCapabs.maxImageCount : minImgCnt;
     
+    std::vector<vk::PresentModeKHR> presModes;
+    {
+      auto res = physDev.getSurfacePresentModesKHR(surf);
+      if(!res.has_value()) {
+        Logger::error("Failed to get surface present modes: {}", vk::to_string(res.result));
+        return false;
+      }
+      presModes = std::move(*res);
+    }
     vk::SwapchainCreateInfoKHR createInfo{
       .surface = surf,
       .minImageCount = minImgCnt,
@@ -76,7 +102,7 @@ namespace mip {
       .imageSharingMode = vk::SharingMode::eExclusive,
       .preTransform = surfCapabs.currentTransform,
       .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-      .presentMode = chooseSPM(physDev.getSurfacePresentModesKHR(surf)),
+      .presentMode = chooseSPM(presModes),
       .clipped = true,
       .oldSwapchain = nullptr
     };
@@ -95,15 +121,23 @@ namespace mip {
       
     {
       auto res = logDev.createSwapchainKHR(createInfo);
-      if(!res) {
-        Logger::error("Failed to create swapchain: {}", vk::to_string(res.error()));
+      if(!res.has_value()) {
+        Logger::error("Failed to create swapchain: {}", vk::to_string(res.result));
         return false;
       }
       
-      m_sc = std::move(res.value());
+      m_sc = std::move(*res);
     }
     
-    m_images = m_sc.getImages();
+    {
+      auto res = m_sc.getImages();
+      if(!res.has_value()) {
+        Logger::error("Failed to get images: {}", vk::to_string(res.result));
+        return false;
+      }
+      
+      m_images = std::move(*res);
+    }
     
     return true;
   }

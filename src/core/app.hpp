@@ -16,7 +16,7 @@ namespace mip {
 
   private:
     
-    std::unique_ptr<Window> m_Window = nullptr;
+    std::unique_ptr<Window> m_window = nullptr;
     std::unique_ptr<IRenderer> m_renderer = nullptr;
     
     std::unique_ptr<game::Scene> m_scene = nullptr;

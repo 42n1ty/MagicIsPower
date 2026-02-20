@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../graphics/renderer/vulkan/vk_renderer.hpp"
 #include "../game/components.hpp"
 #include "../game/loaders.hpp"
 #include "../game/systems.hpp"
@@ -55,8 +56,29 @@ namespace game {
       return true;
     }
     
-    void update(const float dT) {
+    bool update(const float dT, mip::IRenderer* rend, const float w, const float h) {
+      
+      glm::vec2 playerPos{0.f, 0.f};
+      auto& ts = m_manager->view<game::Transform>();
+      auto& ps = m_manager->view<game::PlayerTag>();
+      for(auto e : ps.getOwners()) {
+        playerPos = ts.get(e)->pos;
+        break;
+      }
+      mip::CameraInfo camData{};
+      camData.projection = glm::ortho(0.f, static_cast<float>(w), static_cast<float>(h), 0.f, -1.f, 1.f);
+      float centerX = w / 2.f;
+      float centerY = h / 2.f;
+      glm::mat4 view = glm::mat4(1.f);
+      view = glm::translate(view, glm::vec3(centerX, centerY, 0.f));
+      view = glm::translate(view, glm::vec3(-playerPos.x, -playerPos.y, 0.f));
+      camData.view = view;
+      
+      if(!rend->beginFrame(camData)) return false;
       m_manager->update(dT);
+      if(!rend->endFrame()) return false;
+      
+      return true;
     }
     
     bool createLevel(float width, float height, mip::IRenderer* rend, const std::string& txtrPath) {
