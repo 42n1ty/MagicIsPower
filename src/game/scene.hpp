@@ -21,6 +21,7 @@ namespace game {
       m_manager->registerComponent<game::Velocity>();
       m_manager->registerComponent<game::Script>();
       m_manager->registerComponent<game::PlayerTag>();
+      m_manager->registerComponent<game::BgTile>();
       
       return true;
     }
@@ -35,6 +36,7 @@ namespace game {
       m_manager->registerSystem<game::PatrolSystem>();
       m_manager->registerSystem<game::MovementSystem>();
       m_manager->registerSystem<game::RenderSystem>(rend);
+      m_manager->registerSystem<game::TileSystem>();
       
       return true;
     }
@@ -102,6 +104,35 @@ namespace game {
         .mesh = rend->getGlobalQuad(),
         .material = mapMat
       });
+      
+      return true;
+    }
+    bool createTileLevel(mip::IRenderer* rend, const std::string& txtrPath) {
+      auto tileTxtr = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);
+      auto tileMat = rend->createMaterial("../../assets/shaders/shader.spv");
+      if(!tileMat) {
+        Logger::error("Failed to create material for sprite!");
+        return false;
+      }
+      if (auto tex = m_manager->getAsset(tileTxtr)) {
+        tileMat->setTexture(0, *tex);
+      }
+      
+      for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+          auto tile = m_manager->createEntity();
+          m_manager->addComponent(tile, game::Transform{
+            .pos = {0.f, 0.f},
+            .scale = {game::TileSystem::tileSize, game::TileSystem::tileSize},
+            .z = 0
+          });
+          m_manager->addComponent(tile, game::BgTile{.offset = {static_cast<float>(x), static_cast<float>(y)}});
+          m_manager->addComponent(tile, game::Sprite{
+            .mesh = rend->getGlobalQuad(),
+            .material = tileMat
+          });
+        }
+      }
       
       return true;
     }

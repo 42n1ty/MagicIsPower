@@ -36,4 +36,8 @@ namespace game {
     bool active = true;
   };
   
+  struct BgTile {
+    glm::vec2 offset;
+  };
+  
 }; //game

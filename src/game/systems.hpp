@@ -132,4 +132,27 @@ namespace game {
     }
   };
   
+  class TileSystem : public ecs::ISystem {
+  public:
+    static constexpr float tileSize = 2'500.f;
+    
+    void update(ecs::Manager& manager, const float dT) override {
+      glm::vec2 playerPos{0.f};
+      for(auto& e : manager.view<game::PlayerTag>().getOwners()) {
+        playerPos = manager.getComponent<game::Transform>(e)->pos;
+        break;
+      }
+      
+      auto& tiles = manager.view<game::BgTile>();
+      auto& ts = manager.view<game::Transform>();
+      for(auto& e : tiles.getOwners()) {
+        auto* tile = tiles.get(e);
+        auto* t = ts.get(e);
+        float targetX = std::round(playerPos.x / tileSize) * tileSize + tile->offset.x * tileSize;
+        float targetY = std::round(playerPos.y / tileSize) * tileSize + tile->offset.y * tileSize;
+        
+        t->pos = {targetX, targetY};
+      }
+    }
+  };
 }; //game
