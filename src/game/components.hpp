@@ -25,10 +25,12 @@ namespace game {
   };
   
   struct Velocity {
-    glm::vec2 vel = {0.f, 0.f};
+    glm::vec2 value = {0.f, 0.f};
   };
   
-  struct PlayerTag {};
+  struct CircleCollider {
+    float radius;
+  };
   
   struct Script {
     Task task;
@@ -40,4 +42,31 @@ namespace game {
     glm::vec2 offset;
   };
   
+  
+  struct PlayerTag {};
+  struct EnemyTag {};
+  struct Active { bool value = true; };
+  
+  
+  struct Health {
+    float cur;
+    float max;
+    float iFrames = 0.f;
+  };
+  
+  struct DamageDealer {
+    float amount;
+  };
+  
+  struct Lifetime {
+    float timer;
+  };
+  
+  struct AttachTo {
+    ecs::EntID target;
+  };
+  
+  struct Pierce {
+    int count = 1;
+  };
 }; //game

@@ -9,28 +9,28 @@ namespace game {
     while(true) {
       auto* v = manager.getComponent<Velocity>(e);
       if(!v) co_return;
-      v->vel = {speed, 0.f};
+      v->value = {speed, 0.f};
       co_yield moveTime;
       
-      v->vel = {0.f, 0.f};
+      v->value = {0.f, 0.f};
       co_yield waitTime;
       
-      v->vel = {0.f, speed};
+      v->value = {0.f, speed};
       co_yield moveTime;
       
-      v->vel = {0.f, 0.f};
+      v->value = {0.f, 0.f};
       co_yield waitTime;
       
-      v->vel = {-speed, 0.f};
+      v->value = {-speed, 0.f};
       co_yield moveTime;
       
-      v->vel = {0.f, 0.f};
+      v->value = {0.f, 0.f};
       co_yield waitTime;
       
-      v->vel = {0.f, -speed};
+      v->value = {0.f, -speed};
       co_yield moveTime;
       
-      v->vel = {0.f, 0.f};
+      v->value = {0.f, 0.f};
       co_yield waitTime;
     }
   }

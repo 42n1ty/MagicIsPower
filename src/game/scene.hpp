@@ -20,8 +20,16 @@ namespace game {
       m_manager->registerComponent<game::Sprite>();
       m_manager->registerComponent<game::Velocity>();
       m_manager->registerComponent<game::Script>();
-      m_manager->registerComponent<game::PlayerTag>();
       m_manager->registerComponent<game::BgTile>();
+      m_manager->registerComponent<game::PlayerTag>();
+      m_manager->registerComponent<game::EnemyTag>();
+      m_manager->registerComponent<game::Active>();
+      m_manager->registerComponent<game::CircleCollider>();
+      m_manager->registerComponent<game::Health>();
+      m_manager->registerComponent<game::DamageDealer>();
+      m_manager->registerComponent<game::Lifetime>();
+      m_manager->registerComponent<game::AttachTo>();
+      m_manager->registerComponent<game::Pierce>();
       
       return true;
     }
@@ -33,10 +41,14 @@ namespace game {
     }
     bool regSystems(GLFWwindow* wnd, mip::IRenderer* rend) {
       m_manager->registerSystem<game::PlayerControllerSystem>(wnd);
-      m_manager->registerSystem<game::PatrolSystem>();
-      m_manager->registerSystem<game::MovementSystem>();
-      m_manager->registerSystem<game::RenderSystem>(rend);
       m_manager->registerSystem<game::TileSystem>();
+      // m_manager->registerSystem<game::PatrolSystem>();
+      m_manager->registerSystem<game::MovementSystem>();
+      m_manager->registerSystem<game::AttachmentSystem>();
+      m_manager->registerSystem<game::DamageSystem>();
+      m_manager->registerSystem<game::LifetimeSystem>();
+      m_manager->registerSystem<game::RenderSystem>(rend);
+      m_manager->registerSystem<game::EnemySpawnerSystem>(rend);
       
       return true;
     }
@@ -143,7 +155,7 @@ namespace game {
         .pos = {x, y},
         .scale = {100, 100},
         .rot = 0.f,
-        .z = 2
+        .z = 10
       });
       auto& v = m_manager->addComponent(player, game::Velocity{});
       
@@ -160,6 +172,32 @@ namespace game {
         .mesh = rend->getGlobalQuad(),
         .material = playerMat
       });
+      
+      
+      auto aura = m_manager->createEntity();
+      auto ps = m_manager->view<game::PlayerTag>().getOwners()[0];
+      m_manager->addComponent(aura, game::DamageDealer{.amount = 5.f});
+      m_manager->addComponent(aura, game::Transform{
+        .pos = m_manager->getComponent<game::Transform>(ps)->pos,
+        .scale = {500.f, 500.f},
+        .z = 8
+      });
+      m_manager->addComponent(aura, game::AttachTo{.target = ps});
+      m_manager->addComponent(aura, game::CircleCollider{.radius = 260});
+      auto auraTex = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>("../../assets/textures/222.png");
+      auto auraMat = rend->createMaterial("../../assets/shaders/shader.spv");
+      if(!auraMat) {
+        Logger::error("Failed to create material for aura!");
+        return false;
+      }
+      if (auto tex = m_manager->getAsset(auraTex)) {
+        auraMat->setTexture(0, *tex);
+      }
+      m_manager->addComponent(aura, game::Sprite{
+        .mesh = rend->getGlobalQuad(),
+        .material = auraMat
+      });
+      
       
       return true;
     }

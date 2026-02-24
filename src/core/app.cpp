@@ -37,7 +37,7 @@ namespace mip {
         //  !m_scene->createLevel(m_window->m_width, m_window->m_height, m_renderer.get(), "../../assets/textures/map.png")
          !m_scene->createTileLevel(m_renderer.get(), "../../assets/textures/1.png")
       || !m_scene->createPlayer(m_window->m_width / 2, m_window->m_height / 2, m_renderer.get(), "../../assets/textures/player1.png")
-      || !m_scene->createMobs(m_window->m_width / 3, m_window->m_height / 3, m_renderer.get(), "../../assets/textures/mob1.png")
+      // || !m_scene->createMobs(m_window->m_width / 3, m_window->m_height / 3, m_renderer.get(), "../../assets/textures/mob1.png")
       
     ) return false;   
     // scene==================================================
