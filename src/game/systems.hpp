@@ -82,7 +82,6 @@ namespace game {
   
   class PlayerControllerSystem : public ecs::ISystem {
     GLFWwindow* m_wnd;
-    float speed = 300.f;
     
   public:
     PlayerControllerSystem(GLFWwindow* wnd) : m_wnd(wnd) {}
@@ -106,7 +105,7 @@ namespace game {
           moveDir = glm::normalize(moveDir);
         }
         
-        vel->value = moveDir * speed;
+        vel->value = moveDir * vel->speed;
       }
     }
   };
@@ -187,8 +186,9 @@ namespace game {
         m_pool.pop_back();
         manager.getComponent<game::Active>(e)->value = true;
         manager.getComponent<game::Transform>(e)->pos = spawnPos;
+        manager.getComponent<game::Velocity>(e)->speed = m_speed;
         manager.getComponent<game::Health>(e)->cur = manager.getComponent<game::Health>(e)->max;
-        manager.getComponent<game::Health>(e)->iFrames = 0.2f;
+        // manager.getComponent<game::Health>(e)->iFrames = 0.5f;
       }
       else {
         e = manager.createEntity();
@@ -197,15 +197,15 @@ namespace game {
         manager.addComponent(e, game::Active{});
         manager.addComponent(e, game::Transform{
           .pos = {spawnPos.x, spawnPos.y},
-          .scale = {50, 50},
+          .scale = {50.f, 50.f},
           .rot = 0.f,
           .z = 9
         });
-        manager.addComponent(e, game::Velocity{});
-        manager.addComponent(e, game::CircleCollider{.radius = 27.f});
+        manager.addComponent(e, game::Velocity{.speed = m_speed});
+        manager.addComponent(e, game::CircleCollider{.radius = manager.getComponent<Transform>(e)->scale.x / 2.f});
         manager.addComponent(e, game::Health{
-          .max = 30,
-          .iFrames = 0.2f
+          .max = 30.f,
+          .iFrames = 0.5f
         });
         manager.getComponent<game::Health>(e)->cur = manager.getComponent<game::Health>(e)->max;
         manager.addComponent(e, game::Sprite{
@@ -278,7 +278,7 @@ namespace game {
         if(act && !act->value) continue;
         auto* vel = manager.getComponent<game::Velocity>(e);
         auto* ts = manager.getComponent<game::Transform>(e);
-        vel->value = glm::normalize(plPos - ts->pos) * m_speed;
+        vel->value = glm::normalize(plPos - ts->pos) * vel->speed;
       }
       
       // check HP
@@ -296,31 +296,36 @@ namespace game {
   };
   
   class DamageSystem : public ecs::ISystem {
+    
+    std::vector<ecs::EntID> m_weaponsToDestroy;
+    
   public:
     void update(ecs::Manager& manager, const float dT) override {
+      m_weaponsToDestroy.clear();
+      
       auto& healths = manager.view<game::Health>();
+      auto& enemies = manager.view<game::EnemyTag>();
       auto& circles = manager.view<game::CircleCollider>();
       auto& ts = manager.view<game::Transform>();
       auto& dds = manager.view<game::DamageDealer>();
       auto& acts = manager.view<game::Active>();
+      auto& dots = manager.view<game::DoT>();
+      auto& players = manager.view<game::PlayerTag>();
       
-      for(auto e : healths.getOwners()) {
-        auto* act = acts.get(e);
-        if(act && !act->value) continue;
-        auto* hp = healths.get(e);
-        if(hp->iFrames > 0.f) hp->iFrames -= dT;
-      }
       
+      // 1st iter by weapons
       for(auto we : dds.getOwners()) {
         auto* wact = acts.get(we);
         if(wact && !wact->value) continue;
+        auto* dot = dots.get(we);
+        if(dot && dot->curTimer > 0.f) continue;
         auto* wc = circles.get(we);
         auto* wt = ts.get(we);
+        if(!wc || !wt) continue;
         auto* dmg = dds.get(we);
         
-        if(!wc || !wt) continue;
-        
-        for(auto ee : healths.getOwners()) {
+        // 2nd iter by enemies
+        for(auto ee : enemies.getOwners()) {
           auto* eact = acts.get(ee);
           if(eact && !eact->value) continue;
           auto* ehp = healths.get(ee);
@@ -328,25 +333,69 @@ namespace game {
           auto* et = ts.get(ee);
           
           if(!ec || !et) continue;
-          if(ehp->iFrames > 0.f) continue;
-          
+        
           float dist = glm::distance(wt->pos, et->pos);
           if(dist < (wc->radius + ec->radius)) {
-            ehp->cur -= dmg->amount;
-            ehp->iFrames = 0.2f;
+            if(dot) {
+              if(dot->curTimer <= 0.f) {
+                ehp->cur -= dmg->amount;
+              }
+            }
+            else ehp->cur -= dmg->amount;
             
             if(auto* pierce = manager.getComponent<game::Pierce>(we)) {
               pierce->count--;
               if(pierce->count <= 0) {
                 // wact->value = false;
-                manager.destroyEntity(we);
+                m_weaponsToDestroy.emplace_back(we);
                 break;
               }
             }
           }
         }
+        
+        if(dot) dot->curTimer = dot->maxTimer;
       }
+      
+      //player & enemy colls
+      for(auto pe : players.getOwners()) {
+        auto* ph = healths.get(pe);
+        auto* pt = ts.get(pe);
+        auto* pc = circles.get(pe);
+        for(auto ee : enemies.getOwners()) {
+          auto* eact = acts.get(ee);
+          if(eact && !eact->value) continue;
+          auto* ehp = healths.get(ee);
+          auto* ec = circles.get(ee);
+          auto* et = ts.get(ee);
+          
+          if(!ec || !et) continue;
+        
+          float dist = glm::distance(pt->pos, et->pos);
+          if(dist < (pc->radius + ec->radius)) {
+            ph->cur -= 5.f;
+            ehp->cur = 0;
+          }
+          
+        }
+        
+        break; //one player
+      }
+      
+      // cd dots
+      for(auto e : dots.getOwners()) {
+        auto* act = acts.get(e);
+        if(act && !act->value) continue;
+        if(auto* dot = dots.get(e); dot->curTimer > 0.f) dot->curTimer -= dT;
+      }
+      
+      // destroy projectiles
+      for (auto we : m_weaponsToDestroy) {
+        manager.destroyEntity(we);
+      }
+      
     }
+    
   };
   
   class AttachmentSystem : public ecs::ISystem {

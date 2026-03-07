@@ -27,6 +27,7 @@ namespace game {
       m_manager->registerComponent<game::CircleCollider>();
       m_manager->registerComponent<game::Health>();
       m_manager->registerComponent<game::DamageDealer>();
+      m_manager->registerComponent<game::DoT>();
       m_manager->registerComponent<game::Lifetime>();
       m_manager->registerComponent<game::AttachTo>();
       m_manager->registerComponent<game::Pierce>();
@@ -92,6 +93,11 @@ namespace game {
       m_manager->update(dT);
       if(!rend->endFrame()) return false;
       
+      if(auto* ph = m_manager->getComponent<game::Health>(ps.getOwners()[0]); ph->cur <= 0) {
+        Logger::debug("Player died!");
+        return false;
+      }
+      
       return true;
     }
     
@@ -153,11 +159,14 @@ namespace game {
       m_manager->addComponent(player, game::PlayerTag{});
       m_manager->addComponent(player, game::Transform{
         .pos = {x, y},
-        .scale = {100, 100},
+        .scale = {100.f, 100.f},
         .rot = 0.f,
         .z = 10
       });
-      auto& v = m_manager->addComponent(player, game::Velocity{});
+      m_manager->addComponent(player, game::CircleCollider{.radius = m_manager->getComponent<Transform>(player)->scale.x * 0.8f});
+      m_manager->addComponent(player, game::Velocity{.speed = 300.f});
+      m_manager->addComponent(player, game::Health{.max = 100.f});
+      m_manager->getComponent<game::Health>(player)->cur = m_manager->getComponent<game::Health>(player)->max;
       
       auto texHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);
       auto playerMat = rend->createMaterial("../../assets/shaders/shader.spv");
@@ -177,13 +186,15 @@ namespace game {
       auto aura = m_manager->createEntity();
       auto ps = m_manager->view<game::PlayerTag>().getOwners()[0];
       m_manager->addComponent(aura, game::DamageDealer{.amount = 5.f});
+      m_manager->addComponent(aura, game::DoT{.maxTimer = 0.2});
+      m_manager->getComponent<game::DoT>(aura)->curTimer = m_manager->getComponent<game::DoT>(aura)->maxTimer;
       m_manager->addComponent(aura, game::Transform{
         .pos = m_manager->getComponent<game::Transform>(ps)->pos,
         .scale = {500.f, 500.f},
         .z = 8
       });
       m_manager->addComponent(aura, game::AttachTo{.target = ps});
-      m_manager->addComponent(aura, game::CircleCollider{.radius = 260});
+      m_manager->addComponent(aura, game::CircleCollider{.radius = m_manager->getComponent<Transform>(aura)->scale.x / 2.f});
       auto auraTex = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>("../../assets/textures/222.png");
       auto auraMat = rend->createMaterial("../../assets/shaders/shader.spv");
       if(!auraMat) {

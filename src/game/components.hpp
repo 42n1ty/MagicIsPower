@@ -26,6 +26,7 @@ namespace game {
   
   struct Velocity {
     glm::vec2 value = {0.f, 0.f};
+    float speed;
   };
   
   struct CircleCollider {
@@ -56,6 +57,11 @@ namespace game {
   
   struct DamageDealer {
     float amount;
+  };
+  
+  struct DoT {
+    float curTimer = 1.f;
+    float maxTimer = 1.f;
   };
   
   struct Lifetime {
