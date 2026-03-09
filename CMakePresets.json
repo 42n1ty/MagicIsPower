@@ -1,0 +1,40 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "displayName": "Win x64 Debug w/ vcpkg",
+      "generator": "Visual Studio 18 2026",
+      "binaryDir": "${sourceDir}/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+      }
+    },
+    {
+      "name": "dbg",
+      "inherits": "base",
+      "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug"}
+    },
+    {
+      "name": "rel",
+      "inherits": "base",
+      "cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "mdb",
+      "configurePreset": "dbg",
+      "configuration": "Debug",
+      "jobs": 12
+    },
+    {
+      "name": "mrb",
+      "configurePreset": "rel",
+      "configuration": "Release",
+      "jobs": 12
+    }
+  ]
+}

@@ -1,1 +1,1 @@
-cmake --build release --config Release
+cmake --build --preset mrb

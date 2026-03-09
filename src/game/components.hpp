@@ -59,13 +59,31 @@ namespace game {
     float amount;
   };
   
-  struct DoT {
+  struct PulseCooldown {
     float curTimer = 1.f;
     float maxTimer = 1.f;
   };
   
+  struct DoTCharge {
+    float damage;
+    float tickRate;
+    float curTickTimer;
+    float lifetime;
+  };
+  
+  struct StatusEffects {
+    std::vector<DoTCharge> dots;
+  };
+  
+  struct AppliesDoT {
+    float dmgPerTick;
+    float tickRate;
+    float duration;
+  };
+  
   struct Lifetime {
-    float timer;
+    float curTimer;
+    float maxTimer;
   };
   
   struct AttachTo {

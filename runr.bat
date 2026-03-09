@@ -1,4 +1,3 @@
-cd bin
-cd Release
+cd bin/Release
 MiP.exe
 cd ../..

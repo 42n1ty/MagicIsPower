@@ -173,6 +173,8 @@ namespace game {
     
   public:
     
+    inline static uint32_t diedCount = 0;
+    
     EnemySpawnerSystem(mip::IRenderer* rend) : m_rend(rend) {
       m_enemyMat = m_rend->createMaterial("../../assets/shaders/shader.spv");
       auto tex = m_rend->createTexture("../../assets/textures/mob1.png", false);
@@ -287,6 +289,7 @@ namespace game {
         auto* active = manager.getComponent<game::Active>(e);
         if (active->value && healths.get(e)->cur <= 0) {
           active->value = false;
+          Logger::debug("Enemy died! #{}", diedCount++);
           m_pool.push_back(e);
           // exp
         }
@@ -309,7 +312,7 @@ namespace game {
       auto& ts = manager.view<game::Transform>();
       auto& dds = manager.view<game::DamageDealer>();
       auto& acts = manager.view<game::Active>();
-      auto& dots = manager.view<game::DoT>();
+      auto& pulses = manager.view<game::PulseCooldown>();
       auto& players = manager.view<game::PlayerTag>();
       
       
@@ -317,8 +320,8 @@ namespace game {
       for(auto we : dds.getOwners()) {
         auto* wact = acts.get(we);
         if(wact && !wact->value) continue;
-        auto* dot = dots.get(we);
-        if(dot && dot->curTimer > 0.f) continue;
+        auto* pulse = pulses.get(we);
+        if(pulse && pulse->curTimer > 0.f) continue;
         auto* wc = circles.get(we);
         auto* wt = ts.get(we);
         if(!wc || !wt) continue;
@@ -336,12 +339,25 @@ namespace game {
         
           float dist = glm::distance(wt->pos, et->pos);
           if(dist < (wc->radius + ec->radius)) {
-            if(dot) {
-              if(dot->curTimer <= 0.f) {
+            if(pulse) {
+              if(pulse->curTimer <= 0.f) {
                 ehp->cur -= dmg->amount;
               }
             }
             else ehp->cur -= dmg->amount;
+            
+            if(auto* applies = manager.getComponent<game::AppliesDoT>(we)) {
+              auto* statuses = manager.getComponent<game::StatusEffects>(ee);
+              if(!statuses) {
+                statuses = &manager.addComponent(ee, game::StatusEffects{});
+              }
+              statuses->dots.emplace_back(game::DoTCharge{
+                .damage = applies->dmgPerTick,
+                .tickRate = applies->tickRate,
+                .curTickTimer = applies->tickRate,
+                .lifetime = applies->duration
+              });
+            }
             
             if(auto* pierce = manager.getComponent<game::Pierce>(we)) {
               pierce->count--;
@@ -354,7 +370,7 @@ namespace game {
           }
         }
         
-        if(dot) dot->curTimer = dot->maxTimer;
+        if(pulse) pulse->curTimer = pulse->maxTimer;
       }
       
       //player & enemy colls
@@ -374,6 +390,7 @@ namespace game {
           float dist = glm::distance(pt->pos, et->pos);
           if(dist < (pc->radius + ec->radius)) {
             ph->cur -= 5.f;
+            Logger::info("Get hit!");
             ehp->cur = 0;
           }
           
@@ -383,10 +400,10 @@ namespace game {
       }
       
       // cd dots
-      for(auto e : dots.getOwners()) {
+      for(auto e : pulses.getOwners()) {
         auto* act = acts.get(e);
         if(act && !act->value) continue;
-        if(auto* dot = dots.get(e); dot->curTimer > 0.f) dot->curTimer -= dT;
+        if(auto* pulse = pulses.get(e); pulse->curTimer > 0.f) pulse->curTimer -= dT;
       }
       
       // destroy projectiles
@@ -396,6 +413,40 @@ namespace game {
       
     }
     
+  };
+  
+  class StatusSystem : public ecs::ISystem {
+  public:
+    void update(ecs::Manager& manager, const float dT) override {
+      auto& healths = manager.view<game::Health>();
+      auto& statuses = manager.view<game::StatusEffects>();
+      auto& acts = manager.view<game::Active>();
+      
+      for(auto se : statuses.getOwners()) {
+        auto* act = acts.get(se);
+        if(act && !act->value) continue;
+        
+        auto* hp = healths.get(se);
+        auto* status = statuses.get(se);
+        
+        if(!hp || !status) continue;
+        
+        for(int i = static_cast<int>(status->dots.size()) - 1; i >= 0; --i) {
+          auto& dot = status->dots[i];
+          dot.lifetime -= dT;
+          dot.curTickTimer -= dT;
+          
+          if(dot.curTickTimer <= 0.f) {
+            hp->cur -= dot.damage;
+            dot.curTickTimer = dot.tickRate;
+          }
+          
+          if(dot.lifetime <= 0.f) {
+            status->dots.erase(status->dots.begin() + i);
+          }
+        }
+      }
+    }
   };
   
   class AttachmentSystem : public ecs::ISystem {
@@ -419,8 +470,8 @@ namespace game {
         auto* act = acts.get(e);
         if(act && !act->value) continue;
         auto* te = manager.getComponent<game::Lifetime>(e);
-        if(te && te->timer > 0) te->timer -= dT;
-        if(te->timer <= 0) act->value = false;
+        if(te && te->curTimer > 0) te->curTimer -= dT;
+        if(te->curTimer <= 0) act->value = false;
       }
     }
   };

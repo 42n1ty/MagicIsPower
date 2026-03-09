@@ -1,4 +1,3 @@
-cd bin
-cd Debug
+cd bin/Debug
 MiP.exe
 cd ../..
