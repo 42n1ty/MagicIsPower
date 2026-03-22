@@ -26,8 +26,9 @@ struct BoneData {
 
 struct PushConstants {
     float4x4 model;
+    float4 uvRect; // x,y - offset, z,w - scale
 };
-[[vk::push_constant]] PushConstants pc;
+[[vk::push_constant]] PushConstants pc; //pushconstants in VulkanMaterial::init
 
 struct VSOutput {
     float4 pos : SV_Position;
@@ -50,9 +51,10 @@ VSOutput vertMain(VSInput input) {
     // }
     //anim==========
     
-    output.pos = mul(camera.proj, mul(camera.view, mul(pc.model, float4(input.inPos, 0.f, 1.f))));
+    float4 rawPos = float4(input.inPos, 0.f, 1.f);
+    output.pos = mul(camera.proj, mul(camera.view, mul(pc.model, rawPos)));
     // output.clr = input.inClr;
-    output.texCoord = input.inTexCoord;
+    output.texCoord = input.inTexCoord * pc.uvRect.zw + pc.uvRect.xy;
     return output;
 }
 

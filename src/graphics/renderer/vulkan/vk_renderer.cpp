@@ -260,22 +260,24 @@ namespace mip {
     return true;
   }
   
-  bool VulkanRenderer::submit(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform) {
+  bool VulkanRenderer::submit(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform, const glm::vec4 uvRect) {
     auto vkMesh = std::static_pointer_cast<VulkanMesh>(mesh);
     auto vkMaterial = std::static_pointer_cast<VulkanMaterial>(material);
     
-    ObjectData objData{.model = transform};
+    // ObjectData objData{.model = transform};
     // m_objectUBO.update(objData, m_curFrame);
     
     vkMaterial->bind(*m_curCmdBuf);
     
     m_curCmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, vkMaterial->getPipLayout(), 0, *(m_perFrameDescSets[m_curFrame]), nullptr);
+    
+    PushData pd{.model = transform, .uvRect = uvRect};
     vk::PushConstantsInfo pcInfo{
       .layout = vkMaterial->getPipLayout(),
       .stageFlags = vk::ShaderStageFlagBits::eVertex,
       .offset = 0,
-      .size = sizeof(glm::mat4),
-      .pValues = &transform
+      .size = sizeof(PushData),
+      .pValues = &pd
     };
     m_curCmdBuf->pushConstants2(pcInfo);
     

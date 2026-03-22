@@ -52,9 +52,50 @@ namespace game {
         model = glm::rotate(model, glm::radians(t->rot), glm::vec3(0.f, 0.f, 1.f));
         model = glm::scale(model, glm::vec3(t->scale, 1.f));
         
-        renderer->submit(spr->mesh, spr->material, model);
+        renderer->submit(spr->mesh, spr->material, model, spr->uvRect);
       }
       
+    }
+  };
+  
+  class AnimSystem : public ecs::ISystem {
+  public:
+    void update(ecs::Manager& manager, const float dT) override {
+      auto& animators = manager.view<game::Animator>();
+      auto& sprites = manager.view<game::Sprite>();
+      auto& acts = manager.view<game::Active>();
+      
+      for(auto ae : animators.getOwners()) {
+        auto* act = acts.get(ae);
+        if(act && !act->value) continue;
+        
+        auto* anim = animators.get(ae);
+        auto* spr = sprites.get(ae);
+        
+        if(!spr) continue;
+        
+        anim->timer += dT;
+        
+        if(anim->timer >= anim->frameTime) {
+          anim->timer -= anim->frameTime;
+          anim->curFrame++;
+          
+          if(anim->curFrame >= anim->frameCnt) {
+            if(anim->loop) anim->curFrame = 0;
+            else anim->curFrame = anim->frameCnt - 1;
+          }
+        }
+        
+        int actFrame = anim->startFrame + anim->curFrame;
+        
+        float frameW = 1.f / anim->cols;
+        float frameH = 1.f / anim->rows;
+        
+        float uvX = (actFrame % anim->cols) * frameW;
+        float uvY = (actFrame % anim->rows) * frameH;
+        
+        spr->uvRect = {uvX, uvY, frameW, frameH};
+      }
     }
   };
   

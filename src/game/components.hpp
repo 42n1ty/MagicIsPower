@@ -22,6 +22,33 @@ namespace game {
     std::shared_ptr<mip::IMesh> mesh;
     std::shared_ptr<mip::IMaterial> material;
     glm::vec4 clr{1.f, 1.f, 1.f, 1.f};
+    glm::vec4 uvRect{0.f, 0.f, 1.f, 1.f};
+  };
+  
+  struct Animator {
+    // sprite-sheet grid
+    int cols = 1;
+    int rows = 1;
+    
+    // current anim
+    int startFrame = 0;
+    int frameCnt = 1;
+    float frameTime = 0.05f;
+    bool loop = true;
+    
+    // current state
+    int curFrame = 0;
+    float timer = 0.f;
+    
+    void play(int start, int count, float speed, bool isLoop = true) {
+      if(startFrame == start && frameCnt == count) return;
+      startFrame = start;
+      frameCnt = count;
+      frameTime = speed;
+      loop = isLoop;
+      curFrame = 0;
+      timer = 0.f;
+    }
   };
   
   struct Velocity {

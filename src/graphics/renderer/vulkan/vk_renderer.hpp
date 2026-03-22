@@ -16,6 +16,11 @@ namespace mip {
    * @brief IRenderer implementation w/ Vulkan API
    */
   class VulkanRenderer : public IRenderer {
+    struct PushData {
+      glm::mat4 model;
+      glm::vec4 uvRect;
+    };
+    
   public:
     VulkanRenderer();
     ~VulkanRenderer();
@@ -35,7 +40,7 @@ namespace mip {
     virtual std::shared_ptr<IMaterial> createMaterial(const std::string& vertShaderPath, const std::string& fragShaderPath = "") override;
     
     virtual bool beginFrame(const CameraInfo& camera) override;
-    virtual bool submit(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform) override;
+    virtual bool submit(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform, const glm::vec4 uvRect = {0.f, 0.f, 1.f, 1.f}) override;
     // virtual bool submitAnimated(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform, const std::vector<glm::mat4>& boneTransforms) override;
     virtual bool endFrame() override;
     
