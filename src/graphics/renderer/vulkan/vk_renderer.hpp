@@ -19,6 +19,7 @@ namespace mip {
     struct PushData {
       glm::mat4 model;
       glm::vec4 uvRect;
+      glm::vec4 color;
     };
     
   public:
@@ -40,7 +41,7 @@ namespace mip {
     virtual std::shared_ptr<IMaterial> createMaterial(const std::string& vertShaderPath, const std::string& fragShaderPath = "") override;
     
     virtual bool beginFrame(const CameraInfo& camera) override;
-    virtual bool submit(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform, const glm::vec4 uvRect = {0.f, 0.f, 1.f, 1.f}) override;
+    virtual bool submit(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const RenderInfo& info) override;
     // virtual bool submitAnimated(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform, const std::vector<glm::mat4>& boneTransforms) override;
     virtual bool endFrame() override;
     

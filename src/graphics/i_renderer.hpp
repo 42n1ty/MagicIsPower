@@ -20,6 +20,12 @@ namespace mip {
     SIZE
   };
   
+  struct RenderInfo {
+    glm::mat4 transform;
+    glm::vec4 uvRect = {0.f, 0.f, 1.f, 1.f};
+    glm::vec4 color = {1.f, 1.f, 1.f, 1.f};
+  };
+  
   struct CameraInfo {
     glm::vec3 pos;
     glm::mat4 projection;
@@ -44,7 +50,7 @@ namespace mip {
     virtual std::shared_ptr<IMaterial> createMaterial(const std::string& vertShaderPath, const std::string& fragShaderPath = "") = 0;
     
     virtual bool beginFrame(const CameraInfo& camera) = 0;
-    virtual bool submit(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform, const glm::vec4 uvRect = {0.f, 0.f, 1.f, 1.f}) = 0;
+    virtual bool submit(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const RenderInfo& info) = 0;
     // virtual bool submitAnimated(std::shared_ptr<IMesh> mesh, std::shared_ptr<IMaterial> material, const glm::mat4& transform, const std::vector<glm::mat4>& boneTransforms) = 0;
     
     virtual bool endFrame() = 0;

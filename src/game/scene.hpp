@@ -18,6 +18,7 @@ namespace game {
     bool regComponents() {
       m_manager->registerComponent<game::Transform>();
       m_manager->registerComponent<game::Sprite>();
+      m_manager->registerComponent<game::FlashEffect>();
       m_manager->registerComponent<game::Animator>();
       m_manager->registerComponent<game::Velocity>();
       m_manager->registerComponent<game::Script>();
@@ -49,6 +50,7 @@ namespace game {
       m_manager->registerSystem<game::AttachmentSystem>();
       m_manager->registerSystem<game::DamageSystem>();
       m_manager->registerSystem<game::LifetimeSystem>();
+      m_manager->registerSystem<game::VisualEffectsSystem>();
       m_manager->registerSystem<game::RenderSystem>(rend);
       m_manager->registerSystem<game::AnimSystem>();
       m_manager->registerSystem<game::EnemySpawnerSystem>(rend);

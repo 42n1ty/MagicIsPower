@@ -21,9 +21,17 @@ namespace game {
     // ecs::Handle<std::shared_ptr<mip::ITexture>> texHandle;
     std::shared_ptr<mip::IMesh> mesh;
     std::shared_ptr<mip::IMaterial> material;
-    glm::vec4 clr{1.f, 1.f, 1.f, 1.f};
+    glm::vec4 baseColor{1.f, 1.f, 1.f, 1.f};
+    glm::vec4 curColor{1.f, 1.f, 1.f, 1.f};
     glm::vec4 uvRect{0.f, 0.f, 1.f, 1.f};
   };
+  
+  struct FlashEffect {
+    float curTime = 0.f;
+    float maxTime = 0.3f;
+    glm::vec4 color = {1.f, 0.f, 0.f, 1.f}; // e.g. red - damage, green - poison, blue - freeze
+  };
+  
   
   struct Animator {
     // sprite-sheet grid

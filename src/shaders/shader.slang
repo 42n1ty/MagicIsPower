@@ -27,13 +27,14 @@ struct BoneData {
 struct PushConstants {
     float4x4 model;
     float4 uvRect; // x,y - offset, z,w - scale
+    float4 color;
 };
 [[vk::push_constant]] PushConstants pc; //pushconstants in VulkanMaterial::init
 
 struct VSOutput {
     float4 pos : SV_Position;
-    // float3 clr;
     float2 texCoord;
+    float4 clr;
 };
 
 [shader("vertex")]
@@ -55,6 +56,8 @@ VSOutput vertMain(VSInput input) {
     output.pos = mul(camera.proj, mul(camera.view, mul(pc.model, rawPos)));
     // output.clr = input.inClr;
     output.texCoord = input.inTexCoord * pc.uvRect.zw + pc.uvRect.xy;
+    output.clr = pc.color;
+    
     return output;
 }
 
@@ -64,5 +67,5 @@ VSOutput vertMain(VSInput input) {
 
 [shader("fragment")]
 float4 fragMain(VSOutput inVert) : SV_Target {
-    return sampler.Sample(inVert.texCoord);
+    return sampler.Sample(inVert.texCoord) * inVert.clr;
 }

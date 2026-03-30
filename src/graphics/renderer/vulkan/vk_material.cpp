@@ -22,7 +22,7 @@ namespace mip {
     vk::PushConstantRange pcRange{
       .stageFlags = vk::ShaderStageFlagBits::eVertex,
       .offset = 0,
-      .size = sizeof(glm::mat4) + sizeof(glm::vec4)
+      .size = sizeof(glm::mat4) + sizeof(glm::vec4) * 2
     };
     
     vk::PipelineLayoutCreateInfo plInfo{

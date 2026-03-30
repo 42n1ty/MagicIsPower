@@ -10,6 +10,35 @@
 
 namespace game {
   
+  class VisualEffectsSystem : public ecs::ISystem {
+  public:
+    void update(ecs::Manager& manager, const float dT) override {
+      auto& sprites = manager.view<game::Sprite>();
+      auto& flashes = manager.view<game::FlashEffect>();
+      
+      for(auto spre : sprites.getOwners()) {
+        auto* spr = sprites.get(spre);
+        auto* flash = flashes.get(spre);
+        
+        if(flash && flash->curTime > 0.f) {
+          flash->curTime -= dT;
+          
+          float t = std::max(flash->curTime / flash->maxTime, 0.f);
+          
+          spr->curColor = glm::mix(spr->baseColor, flash->color, t);
+          
+          if(flash->curTime <= 0.f) {
+            manager.removeComponent<game::FlashEffect>(spre);
+            spr->curColor = spr->baseColor;
+          }
+        }
+        else {
+          spr->curColor = spr->baseColor;
+        }
+      }
+    }
+  };
+  
   class RenderSystem : public ecs::ISystem {
     
     struct RenderItem {
@@ -52,7 +81,13 @@ namespace game {
         model = glm::rotate(model, glm::radians(t->rot), glm::vec3(0.f, 0.f, 1.f));
         model = glm::scale(model, glm::vec3(t->scale, 1.f));
         
-        renderer->submit(spr->mesh, spr->material, model, spr->uvRect);
+        mip::RenderInfo info{
+          .transform = model,
+          .uvRect = spr->uvRect,
+          .color = spr->curColor
+        };
+        
+        renderer->submit(spr->mesh, spr->material, info);
       }
       
     }
@@ -385,7 +420,9 @@ namespace game {
                 ehp->cur -= dmg->amount;
               }
             }
-            else ehp->cur -= dmg->amount;
+            else ehp->cur -= dmg->amount; // once damage
+            // flash effect after gaining damage
+            manager.addComponent(ee, game::FlashEffect{ .curTime = 0.5f, .maxTime = 0.5f, .color = {1.f, 0.f, 0.f, 1.f} });
             
             if(auto* applies = manager.getComponent<game::AppliesDoT>(we)) {
               auto* statuses = manager.getComponent<game::StatusEffects>(ee);
@@ -431,7 +468,11 @@ namespace game {
           float dist = glm::distance(pt->pos, et->pos);
           if(dist < (pc->radius + ec->radius)) {
             ph->cur -= 5.f;
-            Logger::info("Get hit!");
+            if(auto* spr = manager.getComponent<game::Sprite>(pe)) {
+              // flash effect after gaining damage
+              manager.addComponent(pe, game::FlashEffect{ .curTime = 0.5f, .maxTime = 0.5f, .color = {1.f, 0.f, 0.f, 1.f} });
+            }
+            // Logger::info("Get hit!");
             ehp->cur = 0;
           }
           
