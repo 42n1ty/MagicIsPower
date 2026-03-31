@@ -28,7 +28,7 @@ namespace mip {
       return false;
     }
     // renderer==================================================
-    
+    // Logger::debug("Sizeof: {}", sizeof(game::Script));
     // scene==================================================
     m_scene = std::make_unique<game::Scene>();
     if(!m_scene->init(m_window->getWindow(), m_renderer.get())) return false;

@@ -18,6 +18,7 @@ namespace game {
     bool regComponents() {
       m_manager->registerComponent<game::Transform>();
       m_manager->registerComponent<game::Sprite>();
+      m_manager->registerComponent<game::ColorTint>();
       m_manager->registerComponent<game::FlashEffect>();
       m_manager->registerComponent<game::Animator>();
       m_manager->registerComponent<game::Velocity>();
@@ -185,6 +186,7 @@ namespace game {
         .mesh = rend->getGlobalQuad(),
         .material = playerMat,
       });
+      m_manager->addComponent(player, game::ColorTint{});
       
       m_manager->addComponent(player, game::Animator{
         .cols = 4,
@@ -197,8 +199,8 @@ namespace game {
       
       auto aura = m_manager->createEntity();
       auto ps = m_manager->view<game::PlayerTag>().getOwners()[0];
-      m_manager->addComponent(aura, game::DamageDealer{.amount = 5.f});
-      m_manager->addComponent(aura, game::PulseCooldown{.maxTimer = 0.2});
+      m_manager->addComponent(aura, game::DamageDealer{.amount = 10.f});
+      m_manager->addComponent(aura, game::PulseCooldown{.maxTimer = 0.5});
       m_manager->getComponent<game::PulseCooldown>(aura)->curTimer = m_manager->getComponent<game::PulseCooldown>(aura)->maxTimer;
       m_manager->addComponent(aura, game::Transform{
         .pos = m_manager->getComponent<game::Transform>(ps)->pos,

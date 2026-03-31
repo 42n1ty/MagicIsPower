@@ -11,26 +11,29 @@
 namespace game {
   
   struct Transform {
-    glm::vec2 pos{0.f, 0.f};
-    glm::vec2 scale{10.f, 10.f}; //pixels
-    float rot = 0.f; //degrees
-    uint32_t z = 0;
-  };
+    glm::vec2 pos{0.f, 0.f}; //4+4
+    glm::vec2 scale{10.f, 10.f}; //pixels //4+4
+    float rot = 0.f; //degrees //4
+    uint32_t z = 0; //4
+  }; //24
   
   struct Sprite {
     // ecs::Handle<std::shared_ptr<mip::ITexture>> texHandle;
-    std::shared_ptr<mip::IMesh> mesh;
-    std::shared_ptr<mip::IMaterial> material;
-    glm::vec4 baseColor{1.f, 1.f, 1.f, 1.f};
-    glm::vec4 curColor{1.f, 1.f, 1.f, 1.f};
-    glm::vec4 uvRect{0.f, 0.f, 1.f, 1.f};
-  };
+    std::shared_ptr<mip::IMesh> mesh; //16
+    std::shared_ptr<mip::IMaterial> material; //16
+    glm::vec4 uvRect{0.f, 0.f, 1.f, 1.f}; //4x4
+  }; //48
+  
+  struct ColorTint {
+    glm::vec4 baseColor{1.f, 1.f, 1.f, 1.f}; //4x4
+    glm::vec4 curColor{1.f, 1.f, 1.f, 1.f}; //4x4
+  }; //32
   
   struct FlashEffect {
-    float curTime = 0.f;
     float maxTime = 0.3f;
+    float curTime = 0.f;
     glm::vec4 color = {1.f, 0.f, 0.f, 1.f}; // e.g. red - damage, green - poison, blue - freeze
-  };
+  }; //24
   
   
   struct Animator {
@@ -57,26 +60,26 @@ namespace game {
       curFrame = 0;
       timer = 0.f;
     }
-  };
+  }; //32
   
   struct Velocity {
     glm::vec2 value = {0.f, 0.f};
     float speed;
-  };
+  }; //12
   
   struct CircleCollider {
     float radius;
-  };
+  }; //4
   
   struct Script {
     Task task;
     float timer = 0.f;
     bool active = true;
-  };
+  }; //16
   
   struct BgTile {
     glm::vec2 offset;
-  };
+  }; //8
   
   
   struct PlayerTag {};
@@ -88,7 +91,7 @@ namespace game {
     float cur;
     float max;
     float iFrames = 0.f;
-  };
+  }; //12
   
   struct DamageDealer {
     float amount;
@@ -97,7 +100,7 @@ namespace game {
   struct PulseCooldown {
     float curTimer = 1.f;
     float maxTimer = 1.f;
-  };
+  }; //8
   
   struct DoTCharge {
     float damage;

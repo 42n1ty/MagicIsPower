@@ -15,9 +15,10 @@ namespace game {
     void update(ecs::Manager& manager, const float dT) override {
       auto& sprites = manager.view<game::Sprite>();
       auto& flashes = manager.view<game::FlashEffect>();
+      auto& clrs = manager.view<game::ColorTint>();
       
       for(auto spre : sprites.getOwners()) {
-        auto* spr = sprites.get(spre);
+        auto* clr = clrs.get(spre);
         auto* flash = flashes.get(spre);
         
         if(flash && flash->curTime > 0.f) {
@@ -25,15 +26,15 @@ namespace game {
           
           float t = std::max(flash->curTime / flash->maxTime, 0.f);
           
-          spr->curColor = glm::mix(spr->baseColor, flash->color, t);
+          clr->curColor = glm::mix(clr->baseColor, flash->color, t);
           
           if(flash->curTime <= 0.f) {
             manager.removeComponent<game::FlashEffect>(spre);
-            spr->curColor = spr->baseColor;
+            clr->curColor = clr->baseColor;
           }
         }
         else {
-          spr->curColor = spr->baseColor;
+          if(clr) clr->curColor = clr->baseColor;
         }
       }
     }
@@ -58,6 +59,7 @@ namespace game {
       rendQ.clear();
       auto& sprites = manager.view<Sprite>();
       auto& ts = manager.view<Transform>();
+      auto& clrs = manager.view<ColorTint>();
       
       for(ecs::EntID entity : sprites.getOwners()) {
         Transform* t = ts.get(entity);
@@ -71,10 +73,11 @@ namespace game {
       });
       
       for(const auto& item : rendQ) {
-        auto* active = manager.getComponent<game::Active>(item.e);
+        auto* active = manager.getComponent<Active>(item.e);
         if(active && !active->value) continue;
         auto* spr = sprites.get(item.e);
         auto* t = ts.get(item.e);
+        auto* clr = clrs.get(item.e);
         
         glm::mat4 model = glm::mat4(1.f);
         model = glm::translate(model, glm::vec3(t->pos, 0.f));
@@ -84,7 +87,7 @@ namespace game {
         mip::RenderInfo info{
           .transform = model,
           .uvRect = spr->uvRect,
-          .color = spr->curColor
+          .color = clr ? clr->curColor : glm::vec4{1.f, 1.f, 1.f, 1.f}
         };
         
         renderer->submit(spr->mesh, spr->material, info);
@@ -290,6 +293,7 @@ namespace game {
           .mesh = m_rend->getGlobalQuad(),
           .material = m_enemyMat
         });
+        manager.addComponent(e, game::ColorTint{});
         
         Logger::debug("Enemy was created: {}", e);
       }
@@ -422,7 +426,8 @@ namespace game {
             }
             else ehp->cur -= dmg->amount; // once damage
             // flash effect after gaining damage
-            manager.addComponent(ee, game::FlashEffect{ .curTime = 0.5f, .maxTime = 0.5f, .color = {1.f, 0.f, 0.f, 1.f} });
+            float time = 0.2f;
+            manager.addComponent(ee, game::FlashEffect{ .maxTime = time, .curTime = time, .color = {1.f, 0.f, 0.f, 1.f} });
             
             if(auto* applies = manager.getComponent<game::AppliesDoT>(we)) {
               auto* statuses = manager.getComponent<game::StatusEffects>(ee);
@@ -470,7 +475,8 @@ namespace game {
             ph->cur -= 5.f;
             if(auto* spr = manager.getComponent<game::Sprite>(pe)) {
               // flash effect after gaining damage
-              manager.addComponent(pe, game::FlashEffect{ .curTime = 0.5f, .maxTime = 0.5f, .color = {1.f, 0.f, 0.f, 1.f} });
+              float time = 0.3f;
+              manager.addComponent(pe, game::FlashEffect{ .maxTime = time, .curTime = time, .color = {1.f, 0.f, 0.f, 1.f} });
             }
             // Logger::info("Get hit!");
             ehp->cur = 0;
