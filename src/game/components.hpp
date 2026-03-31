@@ -10,12 +10,14 @@
 
 namespace game {
   
-  struct Transform {
+  struct Kinematics {
     glm::vec2 pos{0.f, 0.f}; //4+4
     glm::vec2 scale{10.f, 10.f}; //pixels //4+4
+    glm::vec2 vel = {0.f, 0.f}; //4+4
     float rot = 0.f; //degrees //4
+    float speed; //4
     uint32_t z = 0; //4
-  }; //24
+  }; //36
   
   struct Sprite {
     // ecs::Handle<std::shared_ptr<mip::ITexture>> texHandle;
@@ -62,11 +64,6 @@ namespace game {
     }
   }; //32
   
-  struct Velocity {
-    glm::vec2 value = {0.f, 0.f};
-    float speed;
-  }; //12
-  
   struct CircleCollider {
     float radius;
   }; //4
@@ -80,7 +77,6 @@ namespace game {
   struct BgTile {
     glm::vec2 offset;
   }; //8
-  
   
   struct PlayerTag {};
   struct EnemyTag {};

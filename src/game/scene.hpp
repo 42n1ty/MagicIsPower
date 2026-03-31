@@ -16,12 +16,11 @@ namespace game {
     std::unique_ptr<ecs::Manager> m_manager = nullptr;
     
     bool regComponents() {
-      m_manager->registerComponent<game::Transform>();
+      m_manager->registerComponent<game::Kinematics>();
       m_manager->registerComponent<game::Sprite>();
       m_manager->registerComponent<game::ColorTint>();
       m_manager->registerComponent<game::FlashEffect>();
       m_manager->registerComponent<game::Animator>();
-      m_manager->registerComponent<game::Velocity>();
       m_manager->registerComponent<game::Script>();
       m_manager->registerComponent<game::BgTile>();
       m_manager->registerComponent<game::PlayerTag>();
@@ -79,10 +78,10 @@ namespace game {
     bool update(const float dT, mip::IRenderer* rend, const float w, const float h) {
       
       glm::vec2 playerPos{0.f, 0.f};
-      auto& ts = m_manager->view<game::Transform>();
+      auto& ks = m_manager->view<game::Kinematics>();
       auto& ps = m_manager->view<game::PlayerTag>();
       for(auto e : ps.getOwners()) {
-        playerPos = ts.get(e)->pos;
+        playerPos = ks.get(e)->pos;
         break;
       }
       mip::CameraInfo camData{};
@@ -108,7 +107,7 @@ namespace game {
     
     bool createLevel(float width, float height, mip::IRenderer* rend, const std::string& txtrPath) {
       auto map = m_manager->createEntity();
-      m_manager->addComponent(map, game::Transform{
+      m_manager->addComponent(map, game::Kinematics{
         .pos = {width / 2, height / 2},
         .scale = {width, height},
         .rot = 0.f,
@@ -144,7 +143,7 @@ namespace game {
       for(int x = -1; x <= 1; ++x) {
         for(int y = -1; y <= 1; ++y) {
           auto tile = m_manager->createEntity();
-          m_manager->addComponent(tile, game::Transform{
+          m_manager->addComponent(tile, game::Kinematics{
             .pos = {0.f, 0.f},
             .scale = {game::TileSystem::tileSize, game::TileSystem::tileSize},
             .z = 0
@@ -162,14 +161,14 @@ namespace game {
     bool createPlayer(float x, float y, mip::IRenderer* rend, const std::string& txtrPath) {
       auto player = m_manager->createEntity();
       m_manager->addComponent(player, game::PlayerTag{});
-      m_manager->addComponent(player, game::Transform{
+      m_manager->addComponent(player, game::Kinematics{
         .pos = {x, y},
         .scale = {100.f, 100.f},
         .rot = 0.f,
+        .speed = 300.f,
         .z = 10
       });
-      m_manager->addComponent(player, game::CircleCollider{.radius = m_manager->getComponent<Transform>(player)->scale.x / 2.f});
-      m_manager->addComponent(player, game::Velocity{.speed = 300.f});
+      m_manager->addComponent(player, game::CircleCollider{.radius = m_manager->getComponent<Kinematics>(player)->scale.x / 2.f});
       m_manager->addComponent(player, game::Health{.max = 100.f});
       m_manager->getComponent<game::Health>(player)->cur = m_manager->getComponent<game::Health>(player)->max;
       
@@ -202,13 +201,13 @@ namespace game {
       m_manager->addComponent(aura, game::DamageDealer{.amount = 10.f});
       m_manager->addComponent(aura, game::PulseCooldown{.maxTimer = 0.5});
       m_manager->getComponent<game::PulseCooldown>(aura)->curTimer = m_manager->getComponent<game::PulseCooldown>(aura)->maxTimer;
-      m_manager->addComponent(aura, game::Transform{
-        .pos = m_manager->getComponent<game::Transform>(ps)->pos,
+      m_manager->addComponent(aura, game::Kinematics{
+        .pos = m_manager->getComponent<game::Kinematics>(ps)->pos,
         .scale = {500.f, 500.f},
         .z = 8
       });
       m_manager->addComponent(aura, game::AttachTo{.target = ps});
-      m_manager->addComponent(aura, game::CircleCollider{.radius = m_manager->getComponent<Transform>(aura)->scale.x / 2.f});
+      m_manager->addComponent(aura, game::CircleCollider{.radius = m_manager->getComponent<Kinematics>(aura)->scale.x / 2.f});
       auto auraTex = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>("../../assets/textures/222.png");
       auto auraMat = rend->createMaterial("../../assets/shaders/shader.spv");
       if(!auraMat) {
@@ -228,13 +227,12 @@ namespace game {
     }
     bool createMobs(float x, float y, mip::IRenderer* rend, const std::string& txtrPath) {
       auto mob = m_manager->createEntity();
-      m_manager->addComponent(mob, game::Transform{
+      m_manager->addComponent(mob, game::Kinematics{
         .pos = {x, y},
         .scale = {50, 50},
         .rot = 0.f,
         .z = 1
       });
-      auto& v = m_manager->addComponent(mob, game::Velocity{});
       m_manager->addComponent(mob, game::Script{.task = game::squarePatrol(*m_manager, mob, 2.f, 3.f, 150.f)});
       
       auto texHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);

@@ -13,28 +13,34 @@ namespace game {
   class VisualEffectsSystem : public ecs::ISystem {
   public:
     void update(ecs::Manager& manager, const float dT) override {
-      auto& sprites = manager.view<game::Sprite>();
-      auto& flashes = manager.view<game::FlashEffect>();
       auto& clrs = manager.view<game::ColorTint>();
+      auto& flashes = manager.view<game::FlashEffect>();
       
-      for(auto spre : sprites.getOwners()) {
-        auto* clr = clrs.get(spre);
-        auto* flash = flashes.get(spre);
-        
-        if(flash && flash->curTime > 0.f) {
-          flash->curTime -= dT;
+      const auto& flashOwners = flashes.getOwners();
+      auto& flashDense = flashes.getDense();
+      
+      if(flashDense.size() > 0) {
+        for(int i = static_cast<int>(flashDense.size()) - 1; i >= 0; --i) {
+          auto& flash = flashDense[i];
+          ecs::EntID e = flashOwners[i];
           
-          float t = std::max(flash->curTime / flash->maxTime, 0.f);
+          auto* clr = clrs.get(e);
           
-          clr->curColor = glm::mix(clr->baseColor, flash->color, t);
-          
-          if(flash->curTime <= 0.f) {
-            manager.removeComponent<game::FlashEffect>(spre);
-            clr->curColor = clr->baseColor;
+          if(flash.curTime > 0.f) {
+            flash.curTime -= dT;
+            
+            float t = std::max(flash.curTime / flash.maxTime, 0.f);
+            
+            clr->curColor = glm::mix(clr->baseColor, flash.color, t);
+            
+            if(flash.curTime <= 0.f) {
+              manager.removeComponent<game::FlashEffect>(e);
+              clr->curColor = clr->baseColor;
+            }
           }
-        }
-        else {
-          if(clr) clr->curColor = clr->baseColor;
+          else {
+            if(clr) clr->curColor = clr->baseColor;
+          }
         }
       }
     }
@@ -58,14 +64,14 @@ namespace game {
     void update(ecs::Manager& manager, const float dT) override {
       rendQ.clear();
       auto& sprites = manager.view<Sprite>();
-      auto& ts = manager.view<Transform>();
+      auto& ks = manager.view<Kinematics>();
       auto& clrs = manager.view<ColorTint>();
       
       for(ecs::EntID entity : sprites.getOwners()) {
-        Transform* t = ts.get(entity);
-        if(!t) continue;
+        Kinematics* k = ks.get(entity);
+        if(!k) continue;
         
-        rendQ.push_back({entity, t->z});
+        rendQ.push_back({entity, k->z});
       }
       
       std::sort(rendQ.begin(), rendQ.end(), [](const auto& a, const auto& b) {
@@ -76,13 +82,13 @@ namespace game {
         auto* active = manager.getComponent<Active>(item.e);
         if(active && !active->value) continue;
         auto* spr = sprites.get(item.e);
-        auto* t = ts.get(item.e);
+        auto* k = ks.get(item.e);
         auto* clr = clrs.get(item.e);
         
         glm::mat4 model = glm::mat4(1.f);
-        model = glm::translate(model, glm::vec3(t->pos, 0.f));
-        model = glm::rotate(model, glm::radians(t->rot), glm::vec3(0.f, 0.f, 1.f));
-        model = glm::scale(model, glm::vec3(t->scale, 1.f));
+        model = glm::translate(model, glm::vec3(k->pos, 0.f));
+        model = glm::rotate(model, glm::radians(k->rot), glm::vec3(0.f, 0.f, 1.f));
+        model = glm::scale(model, glm::vec3(k->scale, 1.f));
         
         mip::RenderInfo info{
           .transform = model,
@@ -142,18 +148,17 @@ namespace game {
     MovementSystem() {}
     
     void update(ecs::Manager& manager, const float dT) override {
-      auto& sonics = manager.view<Velocity>();
-      auto& ts = manager.view<Transform>();
+      auto& ks = manager.view<Kinematics>();
       
-      for(ecs::EntID e : sonics.getOwners()) {
-        auto* active = manager.getComponent<game::Active>(e);
+      const auto& kinOwners = ks.getOwners();
+      auto& kinDense = ks.getDense();
+      
+      for(size_t i = 0; i < kinDense.size(); ++i) {
+        auto* active = manager.getComponent<game::Active>(i);
         if(active && !active->value) continue;
         
-        auto* t = ts.get(e);
-        if(!t) continue;
-        
-        auto* vel = sonics.get(e);
-        t->pos += vel->value * dT;
+        auto& k = kinDense[i];
+        k.pos += k.vel * dT;
       }
       
     }
@@ -166,12 +171,12 @@ namespace game {
     PlayerControllerSystem(GLFWwindow* wnd) : m_wnd(wnd) {}
     
     void update(ecs::Manager& manager, const float dT) override{
-      auto& vs = manager.view<Velocity>();
+      auto& ks = manager.view<Kinematics>();
       auto& ps = manager.view<PlayerTag>();
       
       for(ecs::EntID e : ps.getOwners()) {
-        auto* vel = vs.get(e);
-        if(!vel) continue;
+        auto* kin = ks.get(e);
+        if(!kin) continue;
         
         glm::vec2 moveDir{0.f, 0.f};
         
@@ -184,7 +189,7 @@ namespace game {
           moveDir = glm::normalize(moveDir);
         }
         
-        vel->value = moveDir * vel->speed;
+        kin->vel = moveDir * kin->speed;
       }
     }
   };
@@ -223,19 +228,19 @@ namespace game {
     void update(ecs::Manager& manager, const float dT) override {
       glm::vec2 playerPos{0.f};
       for(auto& e : manager.view<game::PlayerTag>().getOwners()) {
-        playerPos = manager.getComponent<game::Transform>(e)->pos;
+        playerPos = manager.getComponent<game::Kinematics>(e)->pos;
         break;
       }
       
       auto& tiles = manager.view<game::BgTile>();
-      auto& ts = manager.view<game::Transform>();
+      auto& ks = manager.view<game::Kinematics>();
       for(auto& e : tiles.getOwners()) {
         auto* tile = tiles.get(e);
-        auto* t = ts.get(e);
+        auto* kin = ks.get(e);
         float targetX = std::round(playerPos.x / tileSize) * tileSize + tile->offset.x * tileSize;
         float targetY = std::round(playerPos.y / tileSize) * tileSize + tile->offset.y * tileSize;
         
-        t->pos = {targetX, targetY};
+        kin->pos = {targetX, targetY};
       }
     }
   };
@@ -266,8 +271,9 @@ namespace game {
         e = m_pool.back();
         m_pool.pop_back();
         manager.getComponent<game::Active>(e)->value = true;
-        manager.getComponent<game::Transform>(e)->pos = spawnPos;
-        manager.getComponent<game::Velocity>(e)->speed = m_speed;
+        auto* kin = manager.getComponent<game::Kinematics>(e);
+        kin->pos = spawnPos;
+        kin->speed = m_speed;
         manager.getComponent<game::Health>(e)->cur = manager.getComponent<game::Health>(e)->max;
         // manager.getComponent<game::Health>(e)->iFrames = 0.5f;
       }
@@ -276,14 +282,14 @@ namespace game {
       
         manager.addComponent(e, game::EnemyTag{});
         manager.addComponent(e, game::Active{});
-        manager.addComponent(e, game::Transform{
+        manager.addComponent(e, game::Kinematics{
           .pos = {spawnPos.x, spawnPos.y},
           .scale = {50.f, 50.f},
           .rot = 0.f,
+          .speed = m_speed,
           .z = 9
         });
-        manager.addComponent(e, game::Velocity{.speed = m_speed});
-        manager.addComponent(e, game::CircleCollider{.radius = manager.getComponent<Transform>(e)->scale.x / 2.f});
+        manager.addComponent(e, game::CircleCollider{.radius = manager.getComponent<Kinematics>(e)->scale.x / 2.f});
         manager.addComponent(e, game::Health{
           .max = 30.f,
           .iFrames = 0.5f
@@ -319,7 +325,7 @@ namespace game {
       m_speed = speed;
       glm::vec2 plPos{0.f, 0.f};
       for(auto e : manager.view<game::PlayerTag>().getOwners()) {
-        plPos = manager.getComponent<game::Transform>(e)->pos;
+        plPos = manager.getComponent<game::Kinematics>(e)->pos;
         break;
       }
       
@@ -351,16 +357,15 @@ namespace game {
       // move vectors
       glm::vec2 plPos{0.f, 0.f};
       for(auto e : manager.view<game::PlayerTag>().getOwners()) {
-        plPos = manager.getComponent<game::Transform>(e)->pos;
+        plPos = manager.getComponent<game::Kinematics>(e)->pos;
         break;
       }
       auto& es = manager.view<game::EnemyTag>();
       for(auto e : es.getOwners()) {
         auto* act = manager.getComponent<game::Active>(e);
         if(act && !act->value) continue;
-        auto* vel = manager.getComponent<game::Velocity>(e);
-        auto* ts = manager.getComponent<game::Transform>(e);
-        vel->value = glm::normalize(plPos - ts->pos) * vel->speed;
+        auto* kin = manager.getComponent<game::Kinematics>(e);
+        kin->vel = glm::normalize(plPos - kin->pos) * kin->speed;
       }
       
       // check HP
@@ -389,7 +394,7 @@ namespace game {
       auto& healths = manager.view<game::Health>();
       auto& enemies = manager.view<game::EnemyTag>();
       auto& circles = manager.view<game::CircleCollider>();
-      auto& ts = manager.view<game::Transform>();
+      auto& ks = manager.view<game::Kinematics>();
       auto& dds = manager.view<game::DamageDealer>();
       auto& acts = manager.view<game::Active>();
       auto& pulses = manager.view<game::PulseCooldown>();
@@ -403,7 +408,7 @@ namespace game {
         auto* pulse = pulses.get(we);
         if(pulse && pulse->curTimer > 0.f) continue;
         auto* wc = circles.get(we);
-        auto* wt = ts.get(we);
+        auto* wt = ks.get(we);
         if(!wc || !wt) continue;
         auto* dmg = dds.get(we);
         
@@ -413,7 +418,7 @@ namespace game {
           if(eact && !eact->value) continue;
           auto* ehp = healths.get(ee);
           auto* ec = circles.get(ee);
-          auto* et = ts.get(ee);
+          auto* et = ks.get(ee);
           
           if(!ec || !et) continue;
         
@@ -459,14 +464,14 @@ namespace game {
       //player & enemy colls
       for(auto pe : players.getOwners()) {
         auto* ph = healths.get(pe);
-        auto* pt = ts.get(pe);
+        auto* pt = ks.get(pe);
         auto* pc = circles.get(pe);
         for(auto ee : enemies.getOwners()) {
           auto* eact = acts.get(ee);
           if(eact && !eact->value) continue;
           auto* ehp = healths.get(ee);
           auto* ec = circles.get(ee);
-          auto* et = ts.get(ee);
+          auto* et = ks.get(ee);
           
           if(!ec || !et) continue;
         
@@ -544,9 +549,9 @@ namespace game {
         auto* act = acts.get(e);
         if(act && !act->value) continue;
         auto te = manager.getComponent<game::AttachTo>(e)->target;
-        auto* ts = manager.getComponent<game::Transform>(te);
-        auto* itsTs = manager.getComponent<game::Transform>(e);
-        if(ts && itsTs) itsTs->pos = ts->pos;
+        auto* ks = manager.getComponent<game::Kinematics>(te);
+        auto* itsKs = manager.getComponent<game::Kinematics>(e);
+        if(ks && itsKs) itsKs->pos = ks->pos;
       }
     }
   };

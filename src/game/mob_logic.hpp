@@ -7,30 +7,30 @@ namespace game {
   
   inline Task squarePatrol(ecs::Manager& manager, ecs::EntID e, float moveTime, float waitTime, float speed) {
     while(true) {
-      auto* v = manager.getComponent<Velocity>(e);
-      if(!v) co_return;
-      v->value = {speed, 0.f};
+      auto* k = manager.getComponent<Kinematics>(e);
+      if(!k) co_return;
+      k->vel = {speed, 0.f};
       co_yield moveTime;
       
-      v->value = {0.f, 0.f};
+      k->vel = {0.f, 0.f};
       co_yield waitTime;
       
-      v->value = {0.f, speed};
+      k->vel = {0.f, speed};
       co_yield moveTime;
       
-      v->value = {0.f, 0.f};
+      k->vel = {0.f, 0.f};
       co_yield waitTime;
       
-      v->value = {-speed, 0.f};
+      k->vel = {-speed, 0.f};
       co_yield moveTime;
       
-      v->value = {0.f, 0.f};
+      k->vel = {0.f, 0.f};
       co_yield waitTime;
       
-      v->value = {0.f, -speed};
+      k->vel = {0.f, -speed};
       co_yield moveTime;
       
-      v->value = {0.f, 0.f};
+      k->vel = {0.f, 0.f};
       co_yield waitTime;
     }
   }

@@ -223,6 +223,8 @@ namespace ecs {
     auto end() {return dense.end();}
     
     const std::vector<EntID>& getOwners() const {return backlink;}
+    std::vector<T>& getDense() { return dense; }
+    const std::vector<T>& getDense() const { return dense; }
   };
   
   //==========================================
