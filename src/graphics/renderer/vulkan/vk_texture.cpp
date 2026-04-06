@@ -28,6 +28,23 @@ namespace mip {
     return true;
   }
   
+  bool VulkanTexture::initWhite(
+    vk::raii::PhysicalDevice& pDev,
+    vk::raii::Device& lDev,
+    vk::raii::CommandPool& cmdPool,
+    vk::raii::Queue& graphQ
+  ) {
+    uint8_t whitePixel[4] = {255, 255, 255, 255};
+    
+    if(  !createTextureImgFromData(whitePixel, 1, 1, pDev, lDev, cmdPool, graphQ)
+      || !createTextureImgView(lDev)
+      || !createTextureSampler(pDev, lDev)
+    ) return false;
+    
+    s_path = "default_white";
+    return true;
+  }
+  
   
   bool VulkanTexture::createTextureImg(
     const std::string& path,
@@ -47,6 +64,22 @@ namespace mip {
       return false;
     }
     
+    bool res = createTextureImgFromData(pixels, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), pDev, lDev, cmdPool, graphQ);
+    stbi_image_free(pixels);
+    
+    return res;
+  }
+  
+  bool VulkanTexture::createTextureImgFromData(
+    void* data,
+    uint32_t texW,
+    uint32_t texH,
+    vk::raii::PhysicalDevice& pDev,
+    vk::raii::Device& lDev,
+    vk::raii::CommandPool& cmdPool,
+    vk::raii::Queue& graphQ
+  ) {
+    vk::DeviceSize imgSize = texW * texH * 4;
     vk::raii::Buffer stagingBuf({nullptr});
     vk::raii::DeviceMemory stagingBufMem({nullptr});
     
@@ -60,23 +93,14 @@ namespace mip {
       lDev
     )) return false;
     
-    void* data = nullptr;
-    {
-      auto res = stagingBufMem.mapMemory(0, imgSize);
-      if(!res.has_value()) {
-        Logger::error("Failed to map buffer memory: {}", vk::to_string(res.result));
-        return false;
-      }
-      data = std::move(*res);
-    }
-    
-    memcpy(data, pixels, imgSize);
+    auto res = stagingBufMem.mapMemory(0, imgSize);
+    void* mappedData = res.has_value() ? res.value : nullptr;
+    memcpy(mappedData, data, imgSize);
     stagingBufMem.unmapMemory();
-    stbi_image_free(pixels);
     
     if(!createImage(
-      texWidth,
-      texHeight,
+      texW,
+      texH,
       vk::Format::eR8G8B8A8Srgb,
       vk::ImageTiling::eOptimal,
       vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
@@ -88,7 +112,7 @@ namespace mip {
     )) return false;
     
     if(!transitionImageLayout(lDev, cmdPool, graphQ, m_texImg, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal)) return false;
-    if(!copyBufToImg(stagingBuf, m_texImg, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), lDev, cmdPool, graphQ)) return false;
+    if(!copyBufToImg(stagingBuf, m_texImg, static_cast<uint32_t>(texW), static_cast<uint32_t>(texH), lDev, cmdPool, graphQ)) return false;
     if(!transitionImageLayout(lDev, cmdPool, graphQ, m_texImg, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal)) return false;
     
     return true;

@@ -109,7 +109,15 @@ namespace mip {
   
   std::shared_ptr<ITexture> VulkanRenderer::createTexture(const std::string& path, const bool flip) {
     auto tempTexture = std::make_shared<VulkanTexture>();
-    if(!tempTexture->init(path, m_physDev, m_logDev, m_cmdPool, m_graphQ)) return nullptr;
+    
+    if(path.empty() || path == "white") {
+      if(!tempTexture->initWhite(m_physDev, m_logDev, m_cmdPool, m_graphQ))
+        return nullptr;
+    }
+    else {
+      if(!tempTexture->init(path, m_physDev, m_logDev, m_cmdPool, m_graphQ))
+        return nullptr;
+    }
     
     return tempTexture;
   }
@@ -127,6 +135,9 @@ namespace mip {
     // findDepthFormat(depthFormat, m_physDev);
     
     if(!tempMaterial->init(materialConfig, m_logDev, m_sc, m_perFrameDescSetLayout, m_perMatDescSetLayout, m_descPool, depthFormat)) return nullptr;
+    
+    if(m_defaultTexW)
+      tempMaterial->setTexture(0, m_defaultTexW);
     
     return tempMaterial;
   }
@@ -274,7 +285,8 @@ namespace mip {
     PushData pd{
       .model = info.transform,
       .uvRect = info.uvRect,
-      .color = info.color
+      .color = info.color,
+      .options = info.options
     };
     vk::PushConstantsInfo pcInfo{
       .layout = vkMaterial->getPipLayout(),
@@ -410,7 +422,8 @@ namespace mip {
     glfwSetFramebufferSizeCallback(m_wnd->getWindow(), VulkanRenderer::framebufferResizeCallback);
 
     m_globQuad = createMesh(IMesh::createQuad()); //global mesh for all sprites
-
+    m_defaultTexW = createTexture("", false);
+    
     return true;
   }
   
@@ -1023,6 +1036,7 @@ namespace mip {
     
     // destroing global mesh
     m_globQuad.reset();
+    m_defaultTexW.reset();
     
     cleanupSC();
   }

@@ -28,7 +28,7 @@ namespace game {
   
   struct ColorTint {
     glm::vec4 baseColor{1.f, 1.f, 1.f, 1.f}; //4x4
-    glm::vec4 curColor{1.f, 1.f, 1.f, 1.f}; //4x4
+    glm::vec4 curColor = baseColor; //4x4
   }; //32
   
   struct FlashEffect {
@@ -81,7 +81,19 @@ namespace game {
   struct PlayerTag {};
   struct EnemyTag {};
   struct Active { bool value = true; };
+  struct UITag {};
+  struct UIProgressBar {
+    float maxW;
+  };
+  struct HPBarTag {};
+  struct ExpBarTag {};
   
+  struct Exp {
+    float cur = 0.f;
+    float max = 10.f;
+    uint32_t curLvl = 0;
+    uint32_t maxLvl = 10;
+  }; //16
   
   struct Health {
     float cur;
@@ -122,7 +134,8 @@ namespace game {
   
   struct AttachTo {
     ecs::EntID target;
-  };
+    glm::vec2 offset{0.f, 0.f};
+  }; //12
   
   struct Pierce {
     int count = 1;

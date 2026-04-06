@@ -20,7 +20,10 @@ namespace mip {
       glm::mat4 model;
       glm::vec4 uvRect;
       glm::vec4 color;
+      glm::ivec4 options;
     };
+    
+    std::shared_ptr<ITexture> m_defaultTexW = nullptr;
     
   public:
     VulkanRenderer();

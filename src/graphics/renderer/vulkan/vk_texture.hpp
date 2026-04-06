@@ -23,6 +23,12 @@ namespace mip {
       vk::raii::CommandPool& cmdPool,
       vk::raii::Queue& graphQ
     );
+    bool initWhite(
+      vk::raii::PhysicalDevice& pDev,
+      vk::raii::Device& lDev,
+      vk::raii::CommandPool& cmdPool,
+      vk::raii::Queue& graphQ
+    );
     
     vk::raii::ImageView& getImgView() { return m_texImgView; }
     vk::raii::Sampler& getSampler() { return m_texSampler; }
@@ -33,6 +39,15 @@ namespace mip {
     
     bool createTextureImg(
       const std::string& path,
+      vk::raii::PhysicalDevice& pDev,
+      vk::raii::Device& lDev,
+      vk::raii::CommandPool& cmdPool,
+      vk::raii::Queue& graphQ
+    );
+    bool createTextureImgFromData(
+      void* data,
+      uint32_t texW,
+      uint32_t texH,
       vk::raii::PhysicalDevice& pDev,
       vk::raii::Device& lDev,
       vk::raii::CommandPool& cmdPool,

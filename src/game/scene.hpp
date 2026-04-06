@@ -24,6 +24,11 @@ namespace game {
       m_manager->registerComponent<game::Script>();
       m_manager->registerComponent<game::BgTile>();
       m_manager->registerComponent<game::PlayerTag>();
+      m_manager->registerComponent<game::HPBarTag>();
+      m_manager->registerComponent<game::ExpBarTag>();
+      m_manager->registerComponent<game::Exp>();
+      m_manager->registerComponent<game::UITag>();
+      m_manager->registerComponent<game::UIProgressBar>();
       m_manager->registerComponent<game::EnemyTag>();
       m_manager->registerComponent<game::Active>();
       m_manager->registerComponent<game::CircleCollider>();
@@ -51,9 +56,10 @@ namespace game {
       m_manager->registerSystem<game::DamageSystem>();
       m_manager->registerSystem<game::LifetimeSystem>();
       m_manager->registerSystem<game::VisualEffectsSystem>();
-      m_manager->registerSystem<game::RenderSystem>(rend);
+      m_manager->registerSystem<game::UISystem>();
       m_manager->registerSystem<game::AnimSystem>();
       m_manager->registerSystem<game::EnemySpawnerSystem>(rend);
+      m_manager->registerSystem<game::RenderSystem>(rend);
       
       return true;
     }
@@ -168,7 +174,7 @@ namespace game {
         .speed = 300.f,
         .z = 10
       });
-      m_manager->addComponent(player, game::CircleCollider{.radius = m_manager->getComponent<Kinematics>(player)->scale.x / 2.f});
+      auto pCol = m_manager->addComponent(player, game::CircleCollider{.radius = m_manager->getComponent<Kinematics>(player)->scale.x / 2.f});
       m_manager->addComponent(player, game::Health{.max = 100.f});
       m_manager->getComponent<game::Health>(player)->cur = m_manager->getComponent<game::Health>(player)->max;
       
@@ -186,6 +192,52 @@ namespace game {
         .material = playerMat,
       });
       m_manager->addComponent(player, game::ColorTint{});
+      m_manager->addComponent(player, game::Exp{.cur = 5.f});
+      
+      //hp bar
+      auto hpBar = m_manager->createEntity();
+      m_manager->addComponent(hpBar, game::HPBarTag{});
+      m_manager->addComponent(hpBar, game::UIProgressBar{.maxW = 60.f});
+      m_manager->addComponent(hpBar, game::AttachTo{
+        .target = player,
+        .offset = {0.f, -(pCol.radius)}
+      });
+      m_manager->addComponent(hpBar, game::Kinematics{
+        .pos = {0.f, 0.f},
+        .scale = {60.f, 8.f},
+        .z = 100
+      });
+      m_manager->addComponent(hpBar, game::ColorTint{.baseColor = {1.f, 0.f, 0.f, 1.f}});
+      auto hpBarMat = rend->createMaterial("../../assets/shaders/shader.spv");
+      if(!hpBarMat) {
+        Logger::error("Failed to create material for bars!");
+        return false;
+      }
+      m_manager->addComponent(hpBar, game::Sprite{
+        .mesh = rend->getGlobalQuad(),
+        .material = hpBarMat
+      });
+      
+      //exp bar
+      auto expBar = m_manager->createEntity();
+      m_manager->addComponent(expBar, game::UITag{});
+      m_manager->addComponent(expBar, game::ExpBarTag{});
+      m_manager->addComponent(expBar, game::UIProgressBar{.maxW = x * 2});
+      m_manager->addComponent(expBar, game::Kinematics{
+        .pos = {x, y * 2 - 10.f},
+        .scale = {x * 2, 20.f},
+        .z = 100
+      });
+      m_manager->addComponent(expBar, game::ColorTint{.baseColor = {0.2f, 0.6f, 1.f, 1.f}});
+      auto expBarMat = rend->createMaterial("../../assets/shaders/shader.spv");
+      if(!expBarMat) {
+        Logger::error("Failed to create material for bars!");
+        return false;
+      }
+      m_manager->addComponent(expBar, game::Sprite{
+        .mesh = rend->getGlobalQuad(),
+        .material = expBarMat
+      });
       
       m_manager->addComponent(player, game::Animator{
         .cols = 4,

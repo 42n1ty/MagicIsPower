@@ -24,6 +24,7 @@ namespace mip {
     glm::mat4 transform;
     glm::vec4 uvRect = {0.f, 0.f, 1.f, 1.f};
     glm::vec4 color = {1.f, 1.f, 1.f, 1.f};
+    glm::ivec4 options;
   };
   
   struct CameraInfo {

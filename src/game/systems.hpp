@@ -13,8 +13,8 @@ namespace game {
   class VisualEffectsSystem : public ecs::ISystem {
   public:
     void update(ecs::Manager& manager, const float dT) override {
-      auto& clrs = manager.view<game::ColorTint>();
-      auto& flashes = manager.view<game::FlashEffect>();
+      auto& clrs = manager.view<ColorTint>();
+      auto& flashes = manager.view<FlashEffect>();
       
       const auto& flashOwners = flashes.getOwners();
       auto& flashDense = flashes.getDense();
@@ -34,7 +34,7 @@ namespace game {
             clr->curColor = glm::mix(clr->baseColor, flash.color, t);
             
             if(flash.curTime <= 0.f) {
-              manager.removeComponent<game::FlashEffect>(e);
+              manager.removeComponent<FlashEffect>(e);
               clr->curColor = clr->baseColor;
             }
           }
@@ -90,10 +90,13 @@ namespace game {
         model = glm::rotate(model, glm::radians(k->rot), glm::vec3(0.f, 0.f, 1.f));
         model = glm::scale(model, glm::vec3(k->scale, 1.f));
         
+        glm::ivec4 opts{};
+        opts.x = manager.getComponent<UITag>(item.e) ? 1 : 0;
         mip::RenderInfo info{
           .transform = model,
           .uvRect = spr->uvRect,
-          .color = clr ? clr->curColor : glm::vec4{1.f, 1.f, 1.f, 1.f}
+          .color = clr ? clr->curColor : glm::vec4{1.f, 1.f, 1.f, 1.f},
+          .options = opts
         };
         
         renderer->submit(spr->mesh, spr->material, info);
@@ -102,12 +105,52 @@ namespace game {
     }
   };
   
+  class UISystem : public ecs::ISystem {
+  public:
+    void update(ecs::Manager& manager, const float dT) override {
+      ecs::EntID pe = ecs::NULL_ENT;
+      Health* ph = nullptr;
+      Exp* pexp = nullptr;
+      
+      for(auto e : manager.view<PlayerTag>().getOwners()) {
+        pe = e;
+        ph = manager.getComponent<Health>(e);
+        pexp = manager.getComponent<Exp>(e);
+        
+        break;
+      }
+      
+      if(!ph || !pexp) return;
+      
+      auto& ks = manager.view<Kinematics>();
+      auto& bars = manager.view<UIProgressBar>();
+      
+      for(auto e : manager.view<HPBarTag>().getOwners()) {
+        auto* kin = ks.get(e);
+        auto* bar = bars.get(e);
+        if(kin && bar) {
+          float percent = std::max(ph->cur / ph->max, 0.f);
+          kin->scale.x = bar->maxW * percent;
+        }
+      }
+      
+      for(auto e : manager.view<ExpBarTag>().getOwners()) {
+        auto* kin = ks.get(e);
+        auto* bar = bars.get(e);
+        if(kin && bar) {
+          float percent = std::max(pexp->cur / pexp->max, 0.f);
+          kin->scale.x = bar->maxW * percent;
+        }
+      }
+    }
+  };
+  
   class AnimSystem : public ecs::ISystem {
   public:
     void update(ecs::Manager& manager, const float dT) override {
-      auto& animators = manager.view<game::Animator>();
-      auto& sprites = manager.view<game::Sprite>();
-      auto& acts = manager.view<game::Active>();
+      auto& animators = manager.view<Animator>();
+      auto& sprites = manager.view<Sprite>();
+      auto& acts = manager.view<Active>();
       
       for(auto ae : animators.getOwners()) {
         auto* act = acts.get(ae);
@@ -154,7 +197,7 @@ namespace game {
       auto& kinDense = ks.getDense();
       
       for(size_t i = 0; i < kinDense.size(); ++i) {
-        auto* active = manager.getComponent<game::Active>(i);
+        auto* active = manager.getComponent<Active>(i);
         if(active && !active->value) continue;
         
         auto& k = kinDense[i];
@@ -200,7 +243,7 @@ namespace game {
       auto& scripts = manager.view<Script>();
       
       for(ecs::EntID e : scripts.getOwners()) {
-        auto* active = manager.getComponent<game::Active>(e);
+        auto* active = manager.getComponent<Active>(e);
         if(active && !active->value) continue;
         auto* scr = scripts.get(e);
         if(!scr->active || !scr->task.handle) continue;
@@ -227,13 +270,13 @@ namespace game {
     
     void update(ecs::Manager& manager, const float dT) override {
       glm::vec2 playerPos{0.f};
-      for(auto& e : manager.view<game::PlayerTag>().getOwners()) {
-        playerPos = manager.getComponent<game::Kinematics>(e)->pos;
+      for(auto& e : manager.view<PlayerTag>().getOwners()) {
+        playerPos = manager.getComponent<Kinematics>(e)->pos;
         break;
       }
       
-      auto& tiles = manager.view<game::BgTile>();
-      auto& ks = manager.view<game::Kinematics>();
+      auto& tiles = manager.view<BgTile>();
+      auto& ks = manager.view<Kinematics>();
       for(auto& e : tiles.getOwners()) {
         auto* tile = tiles.get(e);
         auto* kin = ks.get(e);
@@ -270,36 +313,44 @@ namespace game {
       if(!m_pool.empty()) {
         e = m_pool.back();
         m_pool.pop_back();
-        manager.getComponent<game::Active>(e)->value = true;
-        auto* kin = manager.getComponent<game::Kinematics>(e);
+        manager.getComponent<Active>(e)->value = true;
+        auto* kin = manager.getComponent<Kinematics>(e);
         kin->pos = spawnPos;
         kin->speed = m_speed;
-        manager.getComponent<game::Health>(e)->cur = manager.getComponent<game::Health>(e)->max;
-        // manager.getComponent<game::Health>(e)->iFrames = 0.5f;
+        manager.getComponent<Health>(e)->cur = manager.getComponent<Health>(e)->max;
+        
+        if(auto* se = manager.getComponent<StatusEffects>(e))
+          manager.removeComponent<StatusEffects>(e);
+        if(auto* fe = manager.getComponent<FlashEffect>(e))
+          manager.removeComponent<FlashEffect>(e);
+        if(auto* clr = manager.getComponent<ColorTint>(e)) {
+          clr->curColor = clr->baseColor;
+        }
+        // manager.getComponent<Health>(e)->iFrames = 0.5f;
       }
       else {
         e = manager.createEntity();
       
-        manager.addComponent(e, game::EnemyTag{});
-        manager.addComponent(e, game::Active{});
-        manager.addComponent(e, game::Kinematics{
+        manager.addComponent(e, EnemyTag{});
+        manager.addComponent(e, Active{});
+        manager.addComponent(e, Kinematics{
           .pos = {spawnPos.x, spawnPos.y},
           .scale = {50.f, 50.f},
           .rot = 0.f,
           .speed = m_speed,
           .z = 9
         });
-        manager.addComponent(e, game::CircleCollider{.radius = manager.getComponent<Kinematics>(e)->scale.x / 2.f});
-        manager.addComponent(e, game::Health{
+        manager.addComponent(e, CircleCollider{.radius = manager.getComponent<Kinematics>(e)->scale.x / 2.f});
+        manager.addComponent(e, Health{
           .max = 30.f,
           .iFrames = 0.5f
         });
-        manager.getComponent<game::Health>(e)->cur = manager.getComponent<game::Health>(e)->max;
-        manager.addComponent(e, game::Sprite{
+        manager.getComponent<Health>(e)->cur = manager.getComponent<Health>(e)->max;
+        manager.addComponent(e, Sprite{
           .mesh = m_rend->getGlobalQuad(),
           .material = m_enemyMat
         });
-        manager.addComponent(e, game::ColorTint{});
+        manager.addComponent(e, ColorTint{});
         
         Logger::debug("Enemy was created: {}", e);
       }
@@ -324,8 +375,8 @@ namespace game {
     void spawnCircle(ecs::Manager& manager, int count, float speed) {
       m_speed = speed;
       glm::vec2 plPos{0.f, 0.f};
-      for(auto e : manager.view<game::PlayerTag>().getOwners()) {
-        plPos = manager.getComponent<game::Kinematics>(e)->pos;
+      for(auto e : manager.view<PlayerTag>().getOwners()) {
+        plPos = manager.getComponent<Kinematics>(e)->pos;
         break;
       }
       
@@ -337,7 +388,7 @@ namespace game {
         
         ecs::EntID e = createEnemy(manager, spawnPos);
         
-        // auto* vel = manager.getComponent<game::Velocity>(e);
+        // auto* vel = manager.getComponent<Velocity>(e);
         // vel->value = glm::normalize(plPos - spawnPos) * m_speed;
       }
     }
@@ -356,22 +407,25 @@ namespace game {
       
       // move vectors
       glm::vec2 plPos{0.f, 0.f};
-      for(auto e : manager.view<game::PlayerTag>().getOwners()) {
-        plPos = manager.getComponent<game::Kinematics>(e)->pos;
+      for(auto e : manager.view<PlayerTag>().getOwners()) {
+        plPos = manager.getComponent<Kinematics>(e)->pos;
         break;
       }
-      auto& es = manager.view<game::EnemyTag>();
+      auto& es = manager.view<EnemyTag>();
       for(auto e : es.getOwners()) {
-        auto* act = manager.getComponent<game::Active>(e);
+        auto* act = manager.getComponent<Active>(e);
         if(act && !act->value) continue;
-        auto* kin = manager.getComponent<game::Kinematics>(e);
-        kin->vel = glm::normalize(plPos - kin->pos) * kin->speed;
+        auto* kin = manager.getComponent<Kinematics>(e);
+        
+        glm::vec2 dir = plPos - kin->pos;
+        if(glm::length(dir) > 0.0001f) kin->vel = glm::normalize(dir) * kin->speed;
+        else kin->vel = {0.f, 0.f};
       }
       
       // check HP
-      auto& healths = manager.view<game::Health>();
-      for (auto e : manager.view<game::EnemyTag>().getOwners()) {
-        auto* active = manager.getComponent<game::Active>(e);
+      auto& healths = manager.view<Health>();
+      for (auto e : manager.view<EnemyTag>().getOwners()) {
+        auto* active = manager.getComponent<Active>(e);
         if (active->value && healths.get(e)->cur <= 0) {
           active->value = false;
           Logger::debug("Enemy died! #{}", diedCount++);
@@ -385,20 +439,20 @@ namespace game {
   
   class DamageSystem : public ecs::ISystem {
     
-    std::vector<ecs::EntID> m_weaponsToDestroy;
+    std::vector<ecs::EntID> m_toDestroy;
     
   public:
     void update(ecs::Manager& manager, const float dT) override {
-      m_weaponsToDestroy.clear();
+      m_toDestroy.clear();
       
-      auto& healths = manager.view<game::Health>();
-      auto& enemies = manager.view<game::EnemyTag>();
-      auto& circles = manager.view<game::CircleCollider>();
-      auto& ks = manager.view<game::Kinematics>();
-      auto& dds = manager.view<game::DamageDealer>();
-      auto& acts = manager.view<game::Active>();
-      auto& pulses = manager.view<game::PulseCooldown>();
-      auto& players = manager.view<game::PlayerTag>();
+      auto& healths = manager.view<Health>();
+      auto& enemies = manager.view<EnemyTag>();
+      auto& circles = manager.view<CircleCollider>();
+      auto& ks = manager.view<Kinematics>();
+      auto& dds = manager.view<DamageDealer>();
+      auto& acts = manager.view<Active>();
+      auto& pulses = manager.view<PulseCooldown>();
+      auto& players = manager.view<PlayerTag>();
       
       
       // 1st iter by weapons
@@ -432,14 +486,14 @@ namespace game {
             else ehp->cur -= dmg->amount; // once damage
             // flash effect after gaining damage
             float time = 0.2f;
-            manager.addComponent(ee, game::FlashEffect{ .maxTime = time, .curTime = time, .color = {1.f, 0.f, 0.f, 1.f} });
+            manager.addComponent(ee, FlashEffect{ .maxTime = time, .curTime = time, .color = {1.f, 0.f, 0.f, 1.f} });
             
-            if(auto* applies = manager.getComponent<game::AppliesDoT>(we)) {
-              auto* statuses = manager.getComponent<game::StatusEffects>(ee);
+            if(auto* applies = manager.getComponent<AppliesDoT>(we)) {
+              auto* statuses = manager.getComponent<StatusEffects>(ee);
               if(!statuses) {
-                statuses = &manager.addComponent(ee, game::StatusEffects{});
+                statuses = &manager.addComponent(ee, StatusEffects{});
               }
-              statuses->dots.emplace_back(game::DoTCharge{
+              statuses->dots.emplace_back(DoTCharge{
                 .damage = applies->dmgPerTick,
                 .tickRate = applies->tickRate,
                 .curTickTimer = applies->tickRate,
@@ -447,11 +501,11 @@ namespace game {
               });
             }
             
-            if(auto* pierce = manager.getComponent<game::Pierce>(we)) {
+            if(auto* pierce = manager.getComponent<Pierce>(we)) {
               pierce->count--;
               if(pierce->count <= 0) {
                 // wact->value = false;
-                m_weaponsToDestroy.emplace_back(we);
+                m_toDestroy.emplace_back(we);
                 break;
               }
             }
@@ -478,10 +532,10 @@ namespace game {
           float dist = glm::distance(pt->pos, et->pos);
           if(dist < (pc->radius + ec->radius)) {
             ph->cur -= 5.f;
-            if(auto* spr = manager.getComponent<game::Sprite>(pe)) {
+            if(auto* spr = manager.getComponent<Sprite>(pe)) {
               // flash effect after gaining damage
               float time = 0.3f;
-              manager.addComponent(pe, game::FlashEffect{ .maxTime = time, .curTime = time, .color = {1.f, 0.f, 0.f, 1.f} });
+              manager.addComponent(pe, FlashEffect{ .maxTime = time, .curTime = time, .color = {1.f, 0.f, 0.f, 1.f} });
             }
             // Logger::info("Get hit!");
             ehp->cur = 0;
@@ -500,7 +554,7 @@ namespace game {
       }
       
       // destroy projectiles
-      for (auto we : m_weaponsToDestroy) {
+      for (auto we : m_toDestroy) {
         manager.destroyEntity(we);
       }
       
@@ -511,9 +565,9 @@ namespace game {
   class StatusSystem : public ecs::ISystem {
   public:
     void update(ecs::Manager& manager, const float dT) override {
-      auto& healths = manager.view<game::Health>();
-      auto& statuses = manager.view<game::StatusEffects>();
-      auto& acts = manager.view<game::Active>();
+      auto& healths = manager.view<Health>();
+      auto& statuses = manager.view<StatusEffects>();
+      auto& acts = manager.view<Active>();
       
       for(auto se : statuses.getOwners()) {
         auto* act = acts.get(se);
@@ -544,27 +598,41 @@ namespace game {
   
   class AttachmentSystem : public ecs::ISystem {
     void update(ecs::Manager& manager, const float dT) override {
-      auto& acts = manager.view<game::Active>();
-      for(auto e : manager.view<game::AttachTo>().getOwners()) {
+      auto& acts = manager.view<Active>();
+      auto& atts = manager.view<AttachTo>().getOwners();
+      for(auto e : atts) {
         auto* act = acts.get(e);
         if(act && !act->value) continue;
-        auto te = manager.getComponent<game::AttachTo>(e)->target;
-        auto* ks = manager.getComponent<game::Kinematics>(te);
-        auto* itsKs = manager.getComponent<game::Kinematics>(e);
-        if(ks && itsKs) itsKs->pos = ks->pos;
+        auto te = manager.getComponent<AttachTo>(e)->target;
+        auto* ks = manager.getComponent<Kinematics>(te);
+        auto* itsKs = manager.getComponent<Kinematics>(e);
+        if(ks && itsKs)
+          itsKs->pos = ks->pos + manager.getComponent<AttachTo>(e)->offset;
       }
     }
   };
   
   class LifetimeSystem : public ecs::ISystem {
+    
+    std::vector<ecs::EntID> m_toDestroy;
+    
     void update(ecs::Manager& manager, const float dT) override {
-      auto& acts = manager.view<game::Active>();
-      for(auto e : manager.view<game::Lifetime>().getOwners()) {
+      m_toDestroy.clear();
+      
+      auto& acts = manager.view<Active>();
+      for(auto e : manager.view<Lifetime>().getOwners()) {
         auto* act = acts.get(e);
         if(act && !act->value) continue;
-        auto* te = manager.getComponent<game::Lifetime>(e);
-        if(te && te->curTimer > 0) te->curTimer -= dT;
+        auto* te = manager.getComponent<Lifetime>(e);
+        if(te) {
+          te->curTimer -= dT;
+          if(te->curTimer <= 0.f) m_toDestroy.emplace_back(e);
+        }
         if(te->curTimer <= 0) act->value = false;
+      }
+      
+      for(auto e : m_toDestroy) {
+        manager.destroyEntity(e);
       }
     }
   };
