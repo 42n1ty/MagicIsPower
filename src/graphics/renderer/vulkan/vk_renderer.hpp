@@ -23,6 +23,8 @@ namespace mip {
       glm::ivec4 options;
     };
     
+    std::shared_ptr<IMesh> m_globQuad{nullptr}; // for 2D optimization
+    std::shared_ptr<IMesh> m_uiQuad{nullptr}; // for 2D optimization
     std::shared_ptr<ITexture> m_defaultTexW = nullptr;
     
   public:
@@ -38,6 +40,9 @@ namespace mip {
     
     bool init(Window& wnd) override;
     void shutdown() override;
+    
+    std::shared_ptr<IMesh> getGlobalQuad() { return m_globQuad; };
+    std::shared_ptr<IMesh> getUIQuad() { return m_uiQuad; }
     
     virtual std::shared_ptr<IMesh> createMesh(const MeshData& data) override;
     virtual std::shared_ptr<ITexture> createTexture(const std::string& path, const bool flip) override;

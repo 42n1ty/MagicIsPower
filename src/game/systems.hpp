@@ -106,14 +106,86 @@ namespace game {
   };
   
   class UISystem : public ecs::ISystem {
+    GLFWwindow* m_wnd{nullptr};
+    
   public:
+    
+    UISystem(GLFWwindow* wnd) : m_wnd(wnd) {}
+    
     void update(ecs::Manager& manager, const float dT) override {
-      ecs::EntID pe = ecs::NULL_ENT;
+      int w, h;
+      glfwGetWindowSize(m_wnd, &w, &h);
+      float scrW = static_cast<float>(w);
+      float scrH = static_cast<float>(h);
+      
+      auto& ks = manager.view<Kinematics>();
+      auto& bars = manager.view<UIProgressBar>();
+      auto& anchors = manager.view<UIAnchor>();
+      
+      // step 1: layout
+      for(auto ae : anchors.getOwners()) {
+        auto* kin = ks.get(ae);
+        auto* anch = anchors.get(ae);
+        if(!kin || ! anch) continue;
+        
+        float outW = anch->baseSize.x;
+        float outH = anch->baseSize.y;
+        float outX = 0.f;
+        float outY = 0.f;
+        
+        // h align, 0.0 < mesh.x < 1.0
+        switch(anch->hAlign) {
+          case AnchorH::Stretch: {
+            outW = scrW - anch->padding.x * 2.f;
+            outX = anch->padding.x;
+            break;
+          }
+          case AnchorH::Left: {
+            outX = anch->padding.x;
+            break;
+          }
+          case AnchorH::Right: {
+            outX = scrW - outW - anch->padding.x;
+            break;
+          }
+          case AnchorH::Center: {
+            outW = (scrW - outW) / 2.f;
+            break;
+          }
+          default: break;
+        }
+        
+        // v align, -0.5 < mesh.y < 0.5
+        float halfH = outH / 2.f;
+        switch(anch->vAlign) {
+          case AnchorV::Top: {
+            outY = anch->padding.y + halfH;
+            break;
+          }
+          case AnchorV::Bottom: {
+            outY = scrH - anch->padding.y - halfH;
+            break;
+          }
+          case AnchorV::Center: {
+            outY = scrH / 2.f;
+            break;
+          }
+          [[unreachable]] default: break;
+        }
+        
+        kin->pos = {outX, outY};
+        kin->scale = {outW, outH};
+        
+        if(auto* bar = bars.get(ae)) {
+          bar->maxW = outW;
+        }
+      }
+      
+      // step 2: logic
       Health* ph = nullptr;
       Exp* pexp = nullptr;
       
       for(auto e : manager.view<PlayerTag>().getOwners()) {
-        pe = e;
         ph = manager.getComponent<Health>(e);
         pexp = manager.getComponent<Exp>(e);
         
@@ -122,25 +194,24 @@ namespace game {
       
       if(!ph || !pexp) return;
       
-      auto& ks = manager.view<Kinematics>();
-      auto& bars = manager.view<UIProgressBar>();
-      
-      for(auto e : manager.view<HPBarTag>().getOwners()) {
-        auto* kin = ks.get(e);
-        auto* bar = bars.get(e);
-        if(kin && bar) {
-          float percent = std::max(ph->cur / ph->max, 0.f);
-          kin->scale.x = bar->maxW * percent;
+      for(auto be : bars.getOwners()) {
+        auto* kin = ks.get(be);
+        auto* bar = bars.get(be);
+        if(!kin || !bar) continue;
+        
+        float percent;
+        switch(bar->bType) {
+          case BarType::HP: {
+            percent = std::max(ph->cur / ph->max, 0.f);
+            break;
+          }
+          case BarType::EXP: {
+            percent = std::max(pexp->cur / pexp->max, 0.f);
+            break;
+          }
+          default: break;
         }
-      }
-      
-      for(auto e : manager.view<ExpBarTag>().getOwners()) {
-        auto* kin = ks.get(e);
-        auto* bar = bars.get(e);
-        if(kin && bar) {
-          float percent = std::max(pexp->cur / pexp->max, 0.f);
           kin->scale.x = bar->maxW * percent;
-        }
       }
     }
   };

@@ -14,6 +14,7 @@ namespace game {
   class Scene {
     
     std::unique_ptr<ecs::Manager> m_manager = nullptr;
+    float scrW, scrH;
     
     bool regComponents() {
       m_manager->registerComponent<game::Kinematics>();
@@ -24,11 +25,13 @@ namespace game {
       m_manager->registerComponent<game::Script>();
       m_manager->registerComponent<game::BgTile>();
       m_manager->registerComponent<game::PlayerTag>();
-      m_manager->registerComponent<game::HPBarTag>();
-      m_manager->registerComponent<game::ExpBarTag>();
       m_manager->registerComponent<game::Exp>();
       m_manager->registerComponent<game::UITag>();
       m_manager->registerComponent<game::UIProgressBar>();
+      m_manager->registerComponent<game::BarType>();
+      m_manager->registerComponent<game::UIAnchor>();
+      m_manager->registerComponent<game::AnchorH>();
+      m_manager->registerComponent<game::AnchorV>();
       m_manager->registerComponent<game::EnemyTag>();
       m_manager->registerComponent<game::Active>();
       m_manager->registerComponent<game::CircleCollider>();
@@ -56,10 +59,58 @@ namespace game {
       m_manager->registerSystem<game::DamageSystem>();
       m_manager->registerSystem<game::LifetimeSystem>();
       m_manager->registerSystem<game::VisualEffectsSystem>();
-      m_manager->registerSystem<game::UISystem>();
+      m_manager->registerSystem<game::UISystem>(wnd);
       m_manager->registerSystem<game::AnimSystem>();
       m_manager->registerSystem<game::EnemySpawnerSystem>(rend);
       m_manager->registerSystem<game::RenderSystem>(rend);
+      
+      return true;
+    }
+    
+    bool createBars(float x, float y, ecs::EntID player, mip::IRenderer* rend) {
+      auto uiMat = rend->createMaterial("../../assets/shaders/shader.spv");
+      auto whiteTexHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>("../../assets/textures/whitepixel.png");
+      if (auto tex = m_manager->getAsset(whiteTexHandle)) uiMat->setTexture(0, *tex);
+      else {
+        Logger::error("Failed to create ui material!");
+        return false;
+      }
+      
+      // hp
+      auto hpBg = m_manager->createEntity();
+      auto hpAtt = m_manager->addComponent(hpBg, game::AttachTo{ .target = player, .offset = {-30.f, -60.f} });
+      auto hpKin = m_manager->addComponent(hpBg, game::Kinematics{ .scale = {60.f, 8.f}, .z = 99 });
+      m_manager->addComponent(hpBg, game::ColorTint{ .baseColor = {0.1f, 0.1f, 0.1f, 1.f} });
+      m_manager->addComponent(hpBg, game::Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+
+      auto hpFill = m_manager->createEntity();
+      m_manager->addComponent(hpFill, game::UIProgressBar{ .bType = game::BarType::HP, .maxW = 60.f });
+      m_manager->addComponent(hpFill, game::AttachTo{hpAtt});
+      m_manager->addComponent(hpFill, game::Kinematics{ .scale = hpKin.scale, .z = 100 });
+      m_manager->addComponent(hpFill, game::ColorTint{ .baseColor = {1.f, 0.f, 0.f, 1.f} });
+      m_manager->addComponent(hpFill, game::Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+
+      // exp
+      game::UIAnchor expAnchor {
+        .hAlign = game::AnchorH::Stretch, 
+        .vAlign = game::AnchorV::Bottom, 
+        .padding = {10.f, 10.f}
+      };
+
+      auto expBg = m_manager->createEntity();
+      m_manager->addComponent(expBg, game::UITag{});
+      m_manager->addComponent(expBg, game::UIAnchor{expAnchor});
+      m_manager->addComponent(expBg, game::Kinematics{ .z = 99 });
+      m_manager->addComponent(expBg, game::ColorTint{ .baseColor = {0.1f, 0.2f, 0.4f, 1.f} });
+      m_manager->addComponent(expBg, game::Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+
+      auto expFill = m_manager->createEntity();
+      m_manager->addComponent(expFill, game::UITag{});
+      m_manager->addComponent(expFill, game::UIAnchor{expAnchor});
+      m_manager->addComponent(expFill, game::UIProgressBar{ .bType = game::BarType::EXP });
+      m_manager->addComponent(expFill, game::Kinematics{ .z = 100 });
+      m_manager->addComponent(expFill, game::ColorTint{ .baseColor = {0.2f, 0.3f, 1.f, 1.f} });
+      m_manager->addComponent(expFill, game::Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
       
       return true;
     }
@@ -70,11 +121,11 @@ namespace game {
       m_manager = std::make_unique<ecs::Manager>();
     }
     
-    bool init(GLFWwindow* wnd, mip::IRenderer* rend) {
+    bool init(mip::Window* wnd, mip::IRenderer* rend) {
       if(
            !regComponents()
         || !regAssets(rend)
-        || !regSystems(wnd, rend)
+        || !regSystems(wnd->getWindow(), rend)
       ) return false;
       
       Logger::info("Scene initialized successfully.");
@@ -194,50 +245,7 @@ namespace game {
       m_manager->addComponent(player, game::ColorTint{});
       m_manager->addComponent(player, game::Exp{.cur = 5.f});
       
-      //hp bar
-      auto hpBar = m_manager->createEntity();
-      m_manager->addComponent(hpBar, game::HPBarTag{});
-      m_manager->addComponent(hpBar, game::UIProgressBar{.maxW = 60.f});
-      m_manager->addComponent(hpBar, game::AttachTo{
-        .target = player,
-        .offset = {0.f, -(pCol.radius)}
-      });
-      m_manager->addComponent(hpBar, game::Kinematics{
-        .pos = {0.f, 0.f},
-        .scale = {60.f, 8.f},
-        .z = 100
-      });
-      m_manager->addComponent(hpBar, game::ColorTint{.baseColor = {1.f, 0.f, 0.f, 1.f}});
-      auto hpBarMat = rend->createMaterial("../../assets/shaders/shader.spv");
-      if(!hpBarMat) {
-        Logger::error("Failed to create material for bars!");
-        return false;
-      }
-      m_manager->addComponent(hpBar, game::Sprite{
-        .mesh = rend->getGlobalQuad(),
-        .material = hpBarMat
-      });
-      
-      //exp bar
-      auto expBar = m_manager->createEntity();
-      m_manager->addComponent(expBar, game::UITag{});
-      m_manager->addComponent(expBar, game::ExpBarTag{});
-      m_manager->addComponent(expBar, game::UIProgressBar{.maxW = x * 2});
-      m_manager->addComponent(expBar, game::Kinematics{
-        .pos = {x, y * 2 - 10.f},
-        .scale = {x * 2, 20.f},
-        .z = 100
-      });
-      m_manager->addComponent(expBar, game::ColorTint{.baseColor = {0.2f, 0.6f, 1.f, 1.f}});
-      auto expBarMat = rend->createMaterial("../../assets/shaders/shader.spv");
-      if(!expBarMat) {
-        Logger::error("Failed to create material for bars!");
-        return false;
-      }
-      m_manager->addComponent(expBar, game::Sprite{
-        .mesh = rend->getGlobalQuad(),
-        .material = expBarMat
-      });
+      if(!createBars(x, y, player, rend)) return false;
       
       m_manager->addComponent(player, game::Animator{
         .cols = 4,

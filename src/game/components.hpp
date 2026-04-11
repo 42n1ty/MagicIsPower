@@ -81,12 +81,21 @@ namespace game {
   struct PlayerTag {};
   struct EnemyTag {};
   struct Active { bool value = true; };
+  
   struct UITag {};
+  enum class BarType{HP, EXP};
   struct UIProgressBar {
-    float maxW;
+    BarType bType;
+    float maxW{100.f}; //%
   };
-  struct HPBarTag {};
-  struct ExpBarTag {};
+  enum class AnchorH {Left, Center, Right, Stretch};
+  enum class AnchorV {Top, Center, Bottom, Stretch};
+  struct UIAnchor {
+    AnchorH hAlign = AnchorH::Center;
+    AnchorV vAlign = AnchorV::Center;
+    glm::vec2 padding{0.f, 0.f};
+    glm::vec2 baseSize{100.f, 8.f};
+  };
   
   struct Exp {
     float cur = 0.f;

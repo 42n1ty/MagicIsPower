@@ -421,7 +421,8 @@ namespace mip {
     glfwSetWindowUserPointer(m_wnd->getWindow(), this);
     glfwSetFramebufferSizeCallback(m_wnd->getWindow(), VulkanRenderer::framebufferResizeCallback);
 
-    m_globQuad = createMesh(IMesh::createQuad()); //global mesh for all sprites
+    m_globQuad = createMesh(IMesh::createQuad()); //global mesh for sprites
+    m_uiQuad = createMesh(IMesh::createUIQuad()); //global mesh for ui sprites
     m_defaultTexW = createTexture("", false);
     
     return true;
@@ -1036,6 +1037,7 @@ namespace mip {
     
     // destroing global mesh
     m_globQuad.reset();
+    m_uiQuad.reset();
     m_defaultTexW.reset();
     
     cleanupSC();

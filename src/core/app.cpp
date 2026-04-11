@@ -31,7 +31,7 @@ namespace mip {
     // Logger::debug("Sizeof: {}", sizeof(game::Script));
     // scene==================================================
     m_scene = std::make_unique<game::Scene>();
-    if(!m_scene->init(m_window->getWindow(), m_renderer.get())) return false;
+    if(!m_scene->init(m_window.get(), m_renderer.get())) return false;
     
     if(
         //  !m_scene->createLevel(m_window->m_width, m_window->m_height, m_renderer.get(), "../../assets/textures/map.png")

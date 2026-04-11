@@ -44,7 +44,8 @@ namespace mip {
     virtual bool init(Window& wnd) = 0;
     virtual void shutdown() = 0;
     
-    std::shared_ptr<IMesh> getGlobalQuad() {return m_globQuad;} //for 2D optimization
+    virtual std::shared_ptr<IMesh> getGlobalQuad() = 0;// {return m_globQuad;} //for 2D optimization
+    virtual std::shared_ptr<IMesh> getUIQuad() = 0;//{return m_uiQuad; }
     
     virtual std::shared_ptr<IMesh> createMesh(const MeshData& data) = 0;
     virtual std::shared_ptr<ITexture> createTexture(const std::string& path, const bool flip) = 0;
@@ -59,7 +60,6 @@ namespace mip {
     RendererType getType() { return renderer_type; }
     void setType(RendererType type) { renderer_type = type; }
     
-    std::shared_ptr<IMesh> m_globQuad{nullptr}; // for 2D optimization
     
   private:
     RendererType renderer_type;
