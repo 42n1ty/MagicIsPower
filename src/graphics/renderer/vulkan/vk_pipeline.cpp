@@ -56,8 +56,8 @@ namespace mip {
     };
     
     auto res = dev.createShaderModule(createInfo);
-    if(!res.has_value()) {
-      Logger::error("Failed to create shader module: {}", vk::to_string(res.result));
+    if(!res) {
+      Logger::error("Failed to create shader module: {}", vk::to_string(res.error()));
       return std::nullopt;
     }
     auto shaderModule = std::move(*res);
@@ -184,8 +184,8 @@ namespace mip {
     
     {
       auto res = logDev.createPipelineLayout(info);
-      if(!res.has_value()) {
-        Logger::error("Failed to create pipeline layout: {}", vk::to_string(res.result));
+      if(!res) {
+        Logger::error("Failed to create pipeline layout: {}", vk::to_string(res.error()));
         return false;
       }
       m_pipelineLayout = std::move(*res);
@@ -216,8 +216,8 @@ namespace mip {
       
     {
       auto res = logDev.createGraphicsPipeline(nullptr, pipInfo);
-      if(!res.has_value()) {
-        Logger::error("Failed to create graphics pipeline: {}", vk::to_string(res.result));
+      if(!res) {
+        Logger::error("Failed to create graphics pipeline: {}", vk::to_string(res.error()));
         return false;
       }
       m_pipeline = std::move(*res);

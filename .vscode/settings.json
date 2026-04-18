@@ -8,7 +8,7 @@
 		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\fmt_x64-windows-static-md\\include",
 		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\vulkan-memory-allocator_x64-windows-static-md\\include",
 		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\stb_x64-windows-static-md\\include",
-		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\glad_x64-windows-static-md\\include",
+		"C:\\Users\\lmnt1x\\Progs\\vcpkg\\packages\\imgui_x64-windows-static-md\\include",
 	],
 	"files.associations": {
     "chrono": "cpp",

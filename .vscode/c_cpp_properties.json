@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "Win32",
+            "name": "Win64",
             "includePath": [
                 "${default}"
             ],
@@ -12,7 +12,8 @@
             ],
             "windowsSdkVersion": "10.0.26100.0",
             "intelliSenseMode": "windows-msvc-x64",
-            "cppStandard": "c++23"
+            "cppStandard": "c++23",
+            "configurationProvider": "ms-vscode.cmake-tools"
         }
     ],
     "version": 4

@@ -94,7 +94,7 @@ endif()
 
 # list(APPEND CMAKE_PREFIX_PATH "C:/Progs/vcpkg/packages/imgui_x64-windows")
 
-# find_package(imgui CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 # find_package(assimp CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)

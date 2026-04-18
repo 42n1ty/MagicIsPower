@@ -36,8 +36,8 @@ namespace mip {
     
     {
       auto res = lDev.createBuffer(info);
-      if(!res.has_value()) {
-        Logger::error("Failed to create staging buffer: {}", vk::to_string(res.result));
+      if(!res) {
+        Logger::error("Failed to create staging buffer: {}", vk::to_string(res.error()));
         return false;
       }
       buf = std::move(*res);
@@ -61,8 +61,8 @@ namespace mip {
     
     {
       auto res = lDev.allocateMemory(allocInfo);
-      if(!res.has_value()) {
-        Logger::error("Failed to allocate buffer memory: {}", vk::to_string(res.result));
+      if(!res) {
+        Logger::error("Failed to allocate buffer memory: {}", vk::to_string(res.error()));
         return false;
       }
       mem = std::move(*res);
@@ -82,11 +82,11 @@ namespace mip {
     
     {
       auto res = lDev.allocateCommandBuffers(allocInfo);
-      if(!res.has_value()) {
-        Logger::error("Failed to allocate command buffer: {}", vk::to_string(res.result));
+      if(!res) {
+        Logger::error("Failed to allocate command buffer: {}", vk::to_string(res.error()));
         return false;
       }
-      buf = std::move(res.value.front());
+      buf = std::move(res.value().front());
     }
     
     buf.begin(vk::CommandBufferBeginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});

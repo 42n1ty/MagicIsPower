@@ -71,8 +71,8 @@ namespace mip {
     
     {
       auto res = lDev.createImage(imgInfo);
-      if(!res.has_value()) {
-        Logger::error("Failed to create image: {}", vk::to_string(res.result));
+      if(!res) {
+        Logger::error("Failed to create image: {}", vk::to_string(res.error()));
         return false;
       }
       image = std::move(*res);
@@ -95,8 +95,8 @@ namespace mip {
     
     {
       auto res = lDev.allocateMemory(allocInfo);
-      if(!res.has_value()) {
-        Logger::error("Failed to allocate image memory: {}", vk::to_string(res.result));
+      if(!res) {
+        Logger::error("Failed to allocate image memory: {}", vk::to_string(res.error()));
         return false;
       }
       imageMem = std::move(*res);
@@ -237,8 +237,8 @@ namespace mip {
     };
     
     auto res = lDev.createImageView(viewInfo);
-    if(!res.has_value()) {
-      Logger::error("Failed to create image view: {}", vk::to_string(res.result));
+    if(!res) {
+      Logger::error("Failed to create image view: {}", vk::to_string(res.error()));
       return false;
     }
     iv = std::move(*res);

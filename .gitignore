@@ -1,5 +1,5 @@
 *.pdb
-/dbg/
+/build/
 /rel/
 *.zip
 # /bin/

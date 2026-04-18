@@ -93,8 +93,7 @@ namespace mip {
       lDev
     )) return false;
     
-    auto res = stagingBufMem.mapMemory(0, imgSize);
-    void* mappedData = res.has_value() ? res.value : nullptr;
+    void* mappedData = stagingBufMem.mapMemory(0, imgSize);
     memcpy(mappedData, data, imgSize);
     stagingBufMem.unmapMemory();
     
@@ -160,8 +159,8 @@ namespace mip {
     };
     
     auto res = lDev.createSampler(samplerInfo);
-    if(!res.has_value()) {
-      Logger::error("Failed to create texture sampler: {}", vk::to_string(res.result));
+    if(!res) {
+      Logger::error("Failed to create texture sampler: {}", vk::to_string(res.error()));
       return false;
     }
     m_texSampler = std::move(*res);

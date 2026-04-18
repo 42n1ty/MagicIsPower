@@ -19,13 +19,14 @@ namespace mip {
 
   Window::Window(RendererType rType, int width, int height, const std::string& title, bool fullscreen)
     : m_width(width), m_height(height), isFullscreen(fullscreen) {
+    
     glfwSetErrorCallback(error_callback);
-
+    
     if (!glfwInit()) {
       Logger::error("Failed to initialize GLFW!");
       return;
     }
-    
+
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
     if(isFullscreen) {
@@ -55,6 +56,12 @@ namespace mip {
     }
 
     glfwSetWindowUserPointer(m_window, this);
+    
+    glfwSetWindowIconifyCallback(m_window, [](GLFWwindow* window, int iconified) {
+      auto appWindow = static_cast<Window*>(glfwGetWindowUserPointer(window));
+      appWindow->stop_rendering = (iconified == GLFW_TRUE);
+    });
+    
   }
 
   Window::~Window() {

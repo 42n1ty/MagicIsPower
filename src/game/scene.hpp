@@ -17,22 +17,27 @@ namespace game {
     float scrW, scrH;
     
     bool regComponents() {
+      m_manager->registerComponent<game::BgTile>();
+      m_manager->registerComponent<game::Script>();
+      
+      m_manager->registerComponent<game::PlayerTag>();
       m_manager->registerComponent<game::Kinematics>();
       m_manager->registerComponent<game::Sprite>();
       m_manager->registerComponent<game::ColorTint>();
       m_manager->registerComponent<game::FlashEffect>();
       m_manager->registerComponent<game::Animator>();
-      m_manager->registerComponent<game::Script>();
-      m_manager->registerComponent<game::BgTile>();
-      m_manager->registerComponent<game::PlayerTag>();
+      
       m_manager->registerComponent<game::Exp>();
+      m_manager->registerComponent<game::GameState>();
       m_manager->registerComponent<game::UITag>();
       m_manager->registerComponent<game::UIProgressBar>();
       m_manager->registerComponent<game::BarType>();
       m_manager->registerComponent<game::UIAnchor>();
       m_manager->registerComponent<game::AnchorH>();
       m_manager->registerComponent<game::AnchorV>();
+      
       m_manager->registerComponent<game::EnemyTag>();
+      m_manager->registerComponent<game::WeaponTag>();
       m_manager->registerComponent<game::Active>();
       m_manager->registerComponent<game::CircleCollider>();
       m_manager->registerComponent<game::Health>();
@@ -59,9 +64,10 @@ namespace game {
       m_manager->registerSystem<game::DamageSystem>();
       m_manager->registerSystem<game::LifetimeSystem>();
       m_manager->registerSystem<game::VisualEffectsSystem>();
-      m_manager->registerSystem<game::UISystem>(wnd);
       m_manager->registerSystem<game::AnimSystem>();
       m_manager->registerSystem<game::EnemySpawnerSystem>(rend);
+      m_manager->registerSystem<game::UISystem>(wnd);
+      m_manager->registerSystem<game::GamePlayUISystem>();
       m_manager->registerSystem<game::RenderSystem>(rend);
       
       return true;
@@ -134,6 +140,11 @@ namespace game {
     
     bool update(const float dT, mip::IRenderer* rend, const float w, const float h) {
       
+      // ImGui
+      auto* vkRend = static_cast<mip::VulkanRenderer*>(rend);
+      vkRend->beginImGuiFrame();
+      // ImGui::ShowDemoWindow();
+      
       glm::vec2 playerPos{0.f, 0.f};
       auto& ks = m_manager->view<game::Kinematics>();
       auto& ps = m_manager->view<game::PlayerTag>();
@@ -152,6 +163,7 @@ namespace game {
       
       if(!rend->beginFrame(camData)) return false;
       m_manager->update(dT);
+      vkRend->renderImGui();
       if(!rend->endFrame()) return false;
       
       if(auto* ph = m_manager->getComponent<game::Health>(ps.getOwners()[0]); ph->cur <= 0) {
@@ -218,6 +230,7 @@ namespace game {
     bool createPlayer(float x, float y, mip::IRenderer* rend, const std::string& txtrPath) {
       auto player = m_manager->createEntity();
       m_manager->addComponent(player, game::PlayerTag{});
+      m_manager->addComponent(player, game::GameState{});
       m_manager->addComponent(player, game::Kinematics{
         .pos = {x, y},
         .scale = {100.f, 100.f},
@@ -258,6 +271,7 @@ namespace game {
       
       auto aura = m_manager->createEntity();
       auto ps = m_manager->view<game::PlayerTag>().getOwners()[0];
+      m_manager->addComponent(aura, game::WeaponTag{});
       m_manager->addComponent(aura, game::DamageDealer{.amount = 10.f});
       m_manager->addComponent(aura, game::PulseCooldown{.maxTimer = 0.5});
       m_manager->getComponent<game::PulseCooldown>(aura)->curTimer = m_manager->getComponent<game::PulseCooldown>(aura)->maxTimer;

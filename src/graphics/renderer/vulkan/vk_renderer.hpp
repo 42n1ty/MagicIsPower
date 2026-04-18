@@ -4,6 +4,10 @@
 #include "vk_swapchain.hpp"
 #include "vk_ubo.hpp"
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
+
 #include <expected>
 
 struct GLFWwindow;
@@ -31,9 +35,11 @@ namespace mip {
     VulkanRenderer();
     ~VulkanRenderer();
     
-    bool s_isInit{false};
     int s_frameNum{0};
+    bool s_isInit{false};
     bool s_stopRendering{false};
+    
+    bool framebufferResized = false;
     
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
@@ -68,7 +74,8 @@ namespace mip {
       return vk::False;
     }
     
-    bool framebufferResized = false;
+    void beginImGuiFrame();
+    void renderImGui();
     
   private:
     
@@ -91,6 +98,8 @@ namespace mip {
     bool createDescSets();
     bool createCmdBufs();
     bool createSyncObjs();
+    
+    bool initImGui();
     // INIT FUNCS====================================================================================================
     
     // HELPERS FUNCS====================================================================================================
@@ -123,6 +132,8 @@ namespace mip {
     vk::raii::DescriptorSetLayout m_perFrameDescSetLayout{nullptr};
     vk::raii::DescriptorSetLayout m_perMatDescSetLayout{nullptr};
     vk::raii::DescriptorPool m_descPool{nullptr};
+    
+    vk::raii::DescriptorPool m_imguiDescPool{nullptr};
     
     // vk::raii::Image m_depthImg{nullptr};
     // vk::raii::DeviceMemory m_depthImgMem{nullptr};

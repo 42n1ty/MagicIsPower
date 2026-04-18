@@ -49,13 +49,21 @@ namespace mip {
   
   void Application::run() {
     Logger::info("Entering main loop...");
-    float lastFrameTime = 0.0f;
+    float lastFrameTime = static_cast<float>(glfwGetTime());
 
     while (!m_window->shouldClose()) {
-      float currentFrameTime = static_cast<float>(glfwGetTime());
       
-      float deltaTime = currentFrameTime - lastFrameTime;
+      m_window->pollEvents();
+      if(m_window->stop_rendering) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        lastFrameTime = static_cast<float>(glfwGetTime());
+        continue;
+      }
+      
+      float currentFrameTime = static_cast<float>(glfwGetTime());
+      float rawDeltaTime = currentFrameTime - lastFrameTime;
       lastFrameTime = currentFrameTime;
+      float deltaTime = std::min(rawDeltaTime, 0.1f);
       
       processInput(m_window->getWindow(), deltaTime);
       
@@ -70,7 +78,6 @@ namespace mip {
       
       // if(!m_renderer->endFrame()) break;
       
-      m_window->pollEvents();
     }
     
   }

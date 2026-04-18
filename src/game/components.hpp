@@ -80,6 +80,7 @@ namespace game {
   
   struct PlayerTag {};
   struct EnemyTag {};
+  struct WeaponTag {};
   struct Active { bool value = true; };
   
   struct UITag {};
@@ -103,6 +104,10 @@ namespace game {
     uint32_t curLvl = 0;
     uint32_t maxLvl = 10;
   }; //16
+  struct GameState {
+    bool isPaused = false;
+    bool isLvlUp = false;
+  }; //8
   
   struct Health {
     float cur;

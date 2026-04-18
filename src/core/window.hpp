@@ -25,6 +25,7 @@ namespace mip {
     float getAspectRatio() const;
     int m_width;
     int m_height;
+    bool stop_rendering = false;
 
   private:
     GLFWwindow* m_window;

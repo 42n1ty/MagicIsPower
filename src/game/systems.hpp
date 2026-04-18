@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui.h>
 
 #include "../common/ecs_core.hpp"
 #include "components.hpp"
@@ -216,9 +217,133 @@ namespace game {
     }
   };
   
+  class GamePlayUISystem : public ecs::ISystem {
+  public:
+    void update(ecs::Manager& manager, const float dT) override {
+      ecs::EntID pe = ecs::NULL_ENT;
+      Exp* exp = nullptr;
+      GameState* state = nullptr;
+      
+      for(auto e : manager.view<PlayerTag>().getOwners()) {
+        pe = e;
+        exp = manager.getComponent<Exp>(pe);
+        state = manager.getComponent<GameState>(pe);
+        break;
+      }
+      
+      if(!exp || !state)
+        return;
+      
+      //lvl up logic
+      if(exp->cur >= exp->max && !state->isLvlUp) {
+        exp->cur -= exp->max;
+        exp->max *= 1.2f;
+        exp->curLvl++;
+        
+        state->isLvlUp = true;
+        state->isPaused = true;
+      }
+      
+      //hud
+      ImGui::SetNextWindowPos(ImVec2(10, 10));
+      ImGui::Begin("HUD", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
+      ImGui::TextColored(ImVec4(1, 1, 0, 1), "Level: %d", exp->curLvl);
+      ImGui::Text("EXP: %d / %d", (int)exp->cur, (int)exp->max);
+      ImGui::End();
+      
+      //lvl up rendering
+      if(state->isLvlUp) {
+        ImGuiIO& io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(600, 400));
+        
+        ImGui::Begin("LEVEL UP!!!", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+        
+        ImGui::Text("Choose upgrade:");
+        ImGui::Separator();
+        
+        //1st card
+        ImGui::BeginChild("Card1", ImVec2(180, 300), true);
+        ImGui::Text("Aura range +0.2");
+        ImGui::TextWrapped("More aura diameter");
+        ImGui::SetCursorPosY(260);
+        if(ImGui::Button("Select##1", ImVec2(160, 30))) {
+          for(auto we : manager.view<WeaponTag>().getOwners()) {
+            if(auto* weapon = manager.getComponent<WeaponTag>(we)) {
+              auto* wk = manager.getComponent<Kinematics>(we);
+              auto* wc = manager.getComponent<CircleCollider>(we);
+              wk->scale *= 1.2f;
+              wc->radius *= 1.2f;
+              break;
+            }
+          }
+          
+          state->isLvlUp = false;
+          state->isPaused = false;
+        }
+        ImGui::EndChild();
+        
+        ImGui::SameLine();
+        
+        ImGui::BeginChild("Card2", ImVec2(180, 300), true);
+        ImGui::Text("Aura damage +5");
+        ImGui::TextWrapped("Increase aura damage for 1 point");
+        ImGui::SetCursorPosY(260);
+        if(ImGui::Button("Select##2", ImVec2(160, 30))) {
+          for(auto we : manager.view<WeaponTag>().getOwners()) {
+            if(auto* weapon = manager.getComponent<WeaponTag>(we)) {
+              auto* wdd = manager.getComponent<DamageDealer>(we);
+              wdd->amount += 5;
+              break;
+            }
+          }
+          
+          state->isLvlUp = false;
+          state->isPaused = false;
+        }
+        ImGui::EndChild();
+        
+        ImGui::End();
+      }
+    }
+  };
+  
+  class TileSystem : public ecs::ISystem {
+  public:
+    static constexpr float tileSize = 2'500.f;
+    
+    void update(ecs::Manager& manager, const float dT) override {
+      glm::vec2 playerPos{0.f};
+      for(auto& e : manager.view<PlayerTag>().getOwners()) {
+        playerPos = manager.getComponent<Kinematics>(e)->pos;
+        break;
+      }
+      
+      auto& tiles = manager.view<BgTile>();
+      auto& ks = manager.view<Kinematics>();
+      for(auto& e : tiles.getOwners()) {
+        auto* tile = tiles.get(e);
+        auto* kin = ks.get(e);
+        float targetX = std::round(playerPos.x / tileSize) * tileSize + tile->offset.x * tileSize;
+        float targetY = std::round(playerPos.y / tileSize) * tileSize + tile->offset.y * tileSize;
+        
+        kin->pos = {targetX, targetY};
+      }
+    }
+  };
+  
   class AnimSystem : public ecs::ISystem {
   public:
     void update(ecs::Manager& manager, const float dT) override {
+      
+      //check game state
+      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
+        if (auto* state = manager.getComponent<game::GameState>(e)) {
+          if (state->isPaused) return;
+        }
+        break;
+      }
+      
       auto& animators = manager.view<Animator>();
       auto& sprites = manager.view<Sprite>();
       auto& acts = manager.view<Active>();
@@ -262,6 +387,15 @@ namespace game {
     MovementSystem() {}
     
     void update(ecs::Manager& manager, const float dT) override {
+      
+      //check game state
+      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
+        if (auto* state = manager.getComponent<game::GameState>(e)) {
+          if (state->isPaused) return;
+        }
+        break;
+      }
+      
       auto& ks = manager.view<Kinematics>();
       
       const auto& kinOwners = ks.getOwners();
@@ -285,6 +419,15 @@ namespace game {
     PlayerControllerSystem(GLFWwindow* wnd) : m_wnd(wnd) {}
     
     void update(ecs::Manager& manager, const float dT) override{
+      
+      //check game state
+      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
+        if (auto* state = manager.getComponent<game::GameState>(e)) {
+          if (state->isPaused) return;
+        }
+        break;
+      }
+      
       auto& ks = manager.view<Kinematics>();
       auto& ps = manager.view<PlayerTag>();
       
@@ -311,6 +454,15 @@ namespace game {
   class PatrolSystem : public ecs::ISystem {
   public:
     void update(ecs::Manager& manager, const float dT) override {
+      
+      //check game state
+      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
+        if (auto* state = manager.getComponent<game::GameState>(e)) {
+          if (state->isPaused) return;
+        }
+        break;
+      }
+      
       auto& scripts = manager.view<Script>();
       
       for(ecs::EntID e : scripts.getOwners()) {
@@ -331,30 +483,6 @@ namespace game {
             scr->active = false;
           }
         }
-      }
-    }
-  };
-  
-  class TileSystem : public ecs::ISystem {
-  public:
-    static constexpr float tileSize = 2'500.f;
-    
-    void update(ecs::Manager& manager, const float dT) override {
-      glm::vec2 playerPos{0.f};
-      for(auto& e : manager.view<PlayerTag>().getOwners()) {
-        playerPos = manager.getComponent<Kinematics>(e)->pos;
-        break;
-      }
-      
-      auto& tiles = manager.view<BgTile>();
-      auto& ks = manager.view<Kinematics>();
-      for(auto& e : tiles.getOwners()) {
-        auto* tile = tiles.get(e);
-        auto* kin = ks.get(e);
-        float targetX = std::round(playerPos.x / tileSize) * tileSize + tile->offset.x * tileSize;
-        float targetY = std::round(playerPos.y / tileSize) * tileSize + tile->offset.y * tileSize;
-        
-        kin->pos = {targetX, targetY};
       }
     }
   };
@@ -465,6 +593,18 @@ namespace game {
     }
     
     void update(ecs::Manager& manager, const float dT) override {
+      
+      ecs::EntID pe = ecs::NULL_ENT;
+      
+      //check game state
+      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
+        pe = e;
+        if (auto* state = manager.getComponent<game::GameState>(e)) {
+          if (state->isPaused) return;
+        }
+        break;
+      }
+      
       if(!m_waveTask.handle) {
         m_waveTask = wave(manager);
       }
@@ -478,10 +618,8 @@ namespace game {
       
       // move vectors
       glm::vec2 plPos{0.f, 0.f};
-      for(auto e : manager.view<PlayerTag>().getOwners()) {
-        plPos = manager.getComponent<Kinematics>(e)->pos;
-        break;
-      }
+      plPos = manager.getComponent<Kinematics>(pe)->pos;
+      
       auto& es = manager.view<EnemyTag>();
       for(auto e : es.getOwners()) {
         auto* act = manager.getComponent<Active>(e);
@@ -494,11 +632,13 @@ namespace game {
       }
       
       // check HP
+      auto* pexp = manager.getComponent<Exp>(pe);
       auto& healths = manager.view<Health>();
       for (auto e : manager.view<EnemyTag>().getOwners()) {
         auto* active = manager.getComponent<Active>(e);
         if (active->value && healths.get(e)->cur <= 0) {
           active->value = false;
+          pexp->cur += 1;
           Logger::debug("Enemy died! #{}", diedCount++);
           m_pool.push_back(e);
           // exp
@@ -514,6 +654,15 @@ namespace game {
     
   public:
     void update(ecs::Manager& manager, const float dT) override {
+      
+      //check game state
+      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
+        if (auto* state = manager.getComponent<game::GameState>(e)) {
+          if (state->isPaused) return;
+        }
+        break;
+      }
+      
       m_toDestroy.clear();
       
       auto& healths = manager.view<Health>();
@@ -636,6 +785,15 @@ namespace game {
   class StatusSystem : public ecs::ISystem {
   public:
     void update(ecs::Manager& manager, const float dT) override {
+      
+      //check game state
+      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
+        if (auto* state = manager.getComponent<game::GameState>(e)) {
+          if (state->isPaused) return;
+        }
+        break;
+      }
+      
       auto& healths = manager.view<Health>();
       auto& statuses = manager.view<StatusEffects>();
       auto& acts = manager.view<Active>();
@@ -669,6 +827,15 @@ namespace game {
   
   class AttachmentSystem : public ecs::ISystem {
     void update(ecs::Manager& manager, const float dT) override {
+      
+      //check game state
+      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
+        if (auto* state = manager.getComponent<game::GameState>(e)) {
+          if (state->isPaused) return;
+        }
+        break;
+      }
+      
       auto& acts = manager.view<Active>();
       auto& atts = manager.view<AttachTo>().getOwners();
       for(auto e : atts) {
@@ -688,6 +855,15 @@ namespace game {
     std::vector<ecs::EntID> m_toDestroy;
     
     void update(ecs::Manager& manager, const float dT) override {
+      
+      //check game state
+      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
+        if (auto* state = manager.getComponent<game::GameState>(e)) {
+          if (state->isPaused) return;
+        }
+        break;
+      }
+      
       m_toDestroy.clear();
       
       auto& acts = manager.view<Active>();

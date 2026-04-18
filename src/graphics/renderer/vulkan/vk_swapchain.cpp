@@ -59,38 +59,38 @@ namespace mip {
     const uint32_t gID,
     const uint32_t pID
   ) {
-    vk::SurfaceCapabilitiesKHR surfCapabs;
-    {
-      auto res = physDev.getSurfaceCapabilitiesKHR(surf);
-      if(!res.has_value()) {
-        Logger::error("Failed to get surface capabs: {}", vk::to_string(res.result));
-        return false;
-      }
-      surfCapabs = std::move(*res);
-    }
-    std::vector<vk::SurfaceFormatKHR> surfaces;
-    {
-      auto res = physDev.getSurfaceFormatsKHR(surf);
-      if(!res.has_value()) {
-        Logger::error("Failed to get surface formats: {}", vk::to_string(res.result));
-        return false;
-      }
-      surfaces = std::move(*res);
-    }
+    vk::SurfaceCapabilitiesKHR surfCapabs = physDev.getSurfaceCapabilitiesKHR(surf);
+    // {
+    //   auto res = physDev.getSurfaceCapabilitiesKHR(surf);
+    //   if(!res) {
+    //     Logger::error("Failed to get surface capabs: {}", vk::to_string(res.result));
+    //     return false;
+    //   }
+    //   surfCapabs = std::move(*res);
+    // }
+    std::vector<vk::SurfaceFormatKHR> surfaces = physDev.getSurfaceFormatsKHR(surf);
+    // {
+    //   auto res = physDev.getSurfaceFormatsKHR(surf);
+    //   if(!res) {
+    //     Logger::error("Failed to get surface formats: {}", vk::to_string(res.result));
+    //     return false;
+    //   }
+    //   surfaces = std::move(*res);
+    // }
     m_format = chooseSSF(surfaces);
     m_extent = chooseSE(wnd, surfCapabs);
     auto minImgCnt = std::max(3u, surfCapabs.minImageCount);
     minImgCnt = (surfCapabs.maxImageCount > 0 && minImgCnt > surfCapabs.maxImageCount) ? surfCapabs.maxImageCount : minImgCnt;
     
-    std::vector<vk::PresentModeKHR> presModes;
-    {
-      auto res = physDev.getSurfacePresentModesKHR(surf);
-      if(!res.has_value()) {
-        Logger::error("Failed to get surface present modes: {}", vk::to_string(res.result));
-        return false;
-      }
-      presModes = std::move(*res);
-    }
+    std::vector<vk::PresentModeKHR> presModes = physDev.getSurfacePresentModesKHR(surf);
+    // {
+    //   auto res = physDev.getSurfacePresentModesKHR(surf);
+    //   if(!res) {
+    //     Logger::error("Failed to get surface present modes: {}", vk::to_string(res.result));
+    //     return false;
+    //   }
+    //   presModes = std::move(*res);
+    // }
     vk::SwapchainCreateInfoKHR createInfo{
       .surface = surf,
       .minImageCount = minImgCnt,
@@ -121,23 +121,15 @@ namespace mip {
       
     {
       auto res = logDev.createSwapchainKHR(createInfo);
-      if(!res.has_value()) {
-        Logger::error("Failed to create swapchain: {}", vk::to_string(res.result));
+      if(!res) {
+        Logger::error("Failed to create swapchain: {}", vk::to_string(res.error()));
         return false;
       }
       
       m_sc = std::move(*res);
     }
     
-    {
-      auto res = m_sc.getImages();
-      if(!res.has_value()) {
-        Logger::error("Failed to get images: {}", vk::to_string(res.result));
-        return false;
-      }
-      
-      m_images = std::move(*res);
-    }
+    m_images = m_sc.getImages();
     
     return true;
   }

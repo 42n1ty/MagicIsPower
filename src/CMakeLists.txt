@@ -23,6 +23,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   Vulkan::Vulkan
   # opengl32
   # glad::glad
-  # imgui::imgui
+  imgui::imgui
   # $ENV{VULKAN_SDK}/Lib/shaderc_combined.lib
 )

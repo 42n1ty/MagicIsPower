@@ -6,6 +6,14 @@
     "glfw3",
     "glm",
     "fmt",
-    "stb"
+    "stb",
+    "vulkan-memory-allocator",
+    {
+      "name": "imgui",
+      "features": [
+        "glfw-binding",
+        "vulkan-binding"
+      ]
+    }
   ]
 }
