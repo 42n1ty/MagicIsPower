@@ -4,7 +4,7 @@
 #include <imgui.h>
 
 #include "../common/ecs_core.hpp"
-#include "components.hpp"
+#include "skills_db.hpp"
 #include "../graphics/i_renderer.hpp"
 #include "../graphics/i_material.hpp"
 
@@ -26,6 +26,7 @@ namespace game {
           ecs::EntID e = flashOwners[i];
           
           auto* clr = clrs.get(e);
+          if(!clr) continue;
           
           if(flash.curTime > 0.f) {
             flash.curTime -= dT;
@@ -223,12 +224,22 @@ namespace game {
       ecs::EntID pe = ecs::NULL_ENT;
       Exp* exp = nullptr;
       GameState* state = nullptr;
+      Health* health = nullptr;
+      ActiveSkillGem* aura = nullptr;
       
       for(auto e : manager.view<PlayerTag>().getOwners()) {
         pe = e;
         exp = manager.getComponent<Exp>(pe);
         state = manager.getComponent<GameState>(pe);
+        health = manager.getComponent<Health>(pe);
         break;
+      }
+      
+      for(auto ge : manager.view<ActiveSkillGem>().getOwners()) {
+        auto* item = manager.getComponent<InventoryItem>(ge);
+        if(item && item->owner == pe && item->isEquipped) {
+          aura = manager.getComponent<ActiveSkillGem>(ge);
+        }
       }
       
       if(!exp || !state)
@@ -239,6 +250,7 @@ namespace game {
         exp->cur -= exp->max;
         exp->max *= 1.2f;
         exp->curLvl++;
+        health->cur = health->max;
         
         state->isLvlUp = true;
         state->isPaused = true;
@@ -246,9 +258,12 @@ namespace game {
       
       //hud
       ImGui::SetNextWindowPos(ImVec2(10, 10));
-      ImGui::Begin("HUD", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
+      ImGui::Begin("HUD", nullptr, ImGuiWindowFlags_NoDecoration | /*ImGuiWindowFlags_NoBackground | */ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
       ImGui::TextColored(ImVec4(1, 1, 0, 1), "Level: %d", exp->curLvl);
       ImGui::Text("EXP: %d / %d", (int)exp->cur, (int)exp->max);
+      ImGui::Text("Aura lvl: %d", (int)aura->lvl);
+      ImGui::Text("Aura curLvl dmg: %d", (int)aura->curLvlDmg);
+      ImGui::Text("Aura final dmg: %d", (int)aura->finalDmg);
       ImGui::End();
       
       //lvl up rendering
@@ -264,18 +279,13 @@ namespace game {
         
         //1st card
         ImGui::BeginChild("Card1", ImVec2(180, 300), true);
-        ImGui::Text("Aura range +0.2");
-        ImGui::TextWrapped("More aura diameter");
+        ImGui::Text("AoE range 20%%");
+        ImGui::TextWrapped("Increases area of effect for all skills");
         ImGui::SetCursorPosY(260);
         if(ImGui::Button("Select##1", ImVec2(160, 30))) {
-          for(auto we : manager.view<WeaponTag>().getOwners()) {
-            if(auto* weapon = manager.getComponent<WeaponTag>(we)) {
-              auto* wk = manager.getComponent<Kinematics>(we);
-              auto* wc = manager.getComponent<CircleCollider>(we);
-              wk->scale *= 1.2f;
-              wc->radius *= 1.2f;
-              break;
-            }
+          if(auto* pStats = manager.getComponent<PermanentStats>(pe)) {
+            pStats->incAoERadius += 0.2f;
+            manager.addComponent(pe, DirtyStatsTag{});
           }
           
           state->isLvlUp = false;
@@ -286,14 +296,17 @@ namespace game {
         ImGui::SameLine();
         
         ImGui::BeginChild("Card2", ImVec2(180, 300), true);
-        ImGui::Text("Aura damage +5");
-        ImGui::TextWrapped("Increase aura damage for 1 point");
+        ImGui::Text("Aura level up");
+        ImGui::TextWrapped("Increase base aura damage");
         ImGui::SetCursorPosY(260);
         if(ImGui::Button("Select##2", ImVec2(160, 30))) {
-          for(auto we : manager.view<WeaponTag>().getOwners()) {
-            if(auto* weapon = manager.getComponent<WeaponTag>(we)) {
-              auto* wdd = manager.getComponent<DamageDealer>(we);
-              wdd->amount += 5;
+          for(auto ge : manager.view<ActiveSkillGem>().getOwners()) {
+            auto* gem = manager.getComponent<ActiveSkillGem>(ge);
+            auto* item = manager.getComponent<InventoryItem>(ge);
+            
+            if(item && item->owner == pe && gem->skillIdHash == Hash("aura")) {
+              gem->lvl++;
+              manager.addComponent(pe, DirtyStatsTag{});
               break;
             }
           }
@@ -402,7 +415,8 @@ namespace game {
       auto& kinDense = ks.getDense();
       
       for(size_t i = 0; i < kinDense.size(); ++i) {
-        auto* active = manager.getComponent<Active>(i);
+        ecs::EntID e = kinOwners[i];
+        auto* active = manager.getComponent<Active>(e);
         if(active && !active->value) continue;
         
         auto& k = kinDense[i];
@@ -533,11 +547,11 @@ namespace game {
         manager.addComponent(e, EnemyTag{});
         manager.addComponent(e, Active{});
         manager.addComponent(e, Kinematics{
+          .z = 9,
           .pos = {spawnPos.x, spawnPos.y},
           .scale = {50.f, 50.f},
           .rot = 0.f,
-          .speed = m_speed,
-          .z = 9
+          .speed = m_speed
         });
         manager.addComponent(e, CircleCollider{.radius = manager.getComponent<Kinematics>(e)->scale.x / 2.f});
         manager.addComponent(e, Health{
@@ -693,17 +707,32 @@ namespace game {
           auto* ehp = healths.get(ee);
           auto* ec = circles.get(ee);
           auto* et = ks.get(ee);
-          
           if(!ec || !et) continue;
-        
+          
+          float finalDmg = dmg->amount;
+          // if(auto* res = manager.getComponent<Resistances>(ee)) {
+          //   float targetRes = 0.f;
+          //   if(dmg->dmgType == SkillTag::Fire) targetRes = res->fire;
+          //   else if(dmg->dmgType == SkillTag::Water) targetRes = res->water;
+          //   else if(dmg->dmgType == SkillTag::Air) targetRes = res->air;
+          //   else if(dmg->dmgType == SkillTag::Earth) targetRes = res->earth;
+          //   else if(dmg->dmgType == SkillTag::Cold) targetRes = res->cold;
+          //   else if(dmg->dmgType == SkillTag::Lightning) targetRes = res->lightning;
+            
+          //   targetRes -= dmg->pen;
+          //   targetRes = std::max(targetRes, 2.f);
+            
+          //   finalDmg *= (1.f - targetRes);
+          // }
+          
           float dist = glm::distance(wt->pos, et->pos);
           if(dist < (wc->radius + ec->radius)) {
             if(pulse) {
               if(pulse->curTimer <= 0.f) {
-                ehp->cur -= dmg->amount;
+                ehp->cur -= finalDmg;
               }
             }
-            else ehp->cur -= dmg->amount; // once damage
+            else ehp->cur -= finalDmg; // once damage
             // flash effect after gaining damage
             float time = 0.2f;
             manager.addComponent(ee, FlashEffect{ .maxTime = time, .curTime = time, .color = {1.f, 0.f, 0.f, 1.f} });
@@ -780,6 +809,167 @@ namespace game {
       
     }
     
+  };
+  
+  class StatCalcSystem : public ecs::ISystem {
+    SkillDB* m_skillDB;
+  public:
+    StatCalcSystem(SkillDB* db) : m_skillDB(db) {}
+    
+    void update(ecs::Manager& manager, const float dT) override {
+      for(auto pe : manager.view<PlayerTag>().getOwners()) {
+        if(manager.getComponent<DirtyStatsTag>(pe)) {
+          auto* pStats = manager.getComponent<PlayerStats>(pe);
+          auto* prStats = manager.getComponent<PermanentStats>(pe);
+          if(!pStats) continue;
+          
+          pStats->incFireDmg = 0.f;
+          pStats->incColdDmg = 0.f;
+          pStats->incAoERadius = 0.f;
+          pStats->cdReduction = 0.f;
+          pStats->extraProj = 0;
+          
+          //TODO: gear cycle
+          
+          pStats->incFireDmg = prStats->incFireDmg;
+          pStats->incColdDmg = prStats->incColdDmg;
+          pStats->incAoERadius = prStats->incAoERadius;
+          pStats->cdReduction = prStats->cdReduction;
+          pStats->extraProj = prStats->extraProj;
+          
+          manager.removeComponent<DirtyStatsTag>(pe);
+          
+          for(auto ge : manager.view<ActiveSkillGem>().getOwners()) {
+            auto* item = manager.getComponent<InventoryItem>(ge);
+            if(item && item->owner == pe && item->isEquipped) {
+              manager.addComponent(ge, DirtyStatsTag{});
+            }
+          }
+        }
+      }
+      
+      auto& dirtyGems = manager.view<DirtyStatsTag>();
+      for(int i = static_cast<int>(dirtyGems.getDense().size()) - 1; i >= 0; --i) {
+        ecs::EntID ge = dirtyGems.getOwners()[i];
+        auto* gem = manager.getComponent<ActiveSkillGem>(ge);
+        auto* item = manager.getComponent<InventoryItem>(ge);
+        if(!gem || !item || !m_skillDB->activeSkills.count(gem->skillIdHash)) continue;
+        
+        auto* pStats = manager.getComponent<PlayerStats>(item->owner);
+        const auto& baseConf = m_skillDB->activeSkills[gem->skillIdHash];
+        
+        gem->tagsMask = baseConf.tagsMask;
+        gem->finalDmg = baseConf.baseDmg * (1.f + (gem->lvl * 0.5f));
+        gem->curLvlDmg = gem->finalDmg;
+        gem->finalCd = baseConf.baseCd;
+        gem->finalRadius = baseConf.baseRadius;
+        gem->finalProj = baseConf.baseProj;
+        gem->dmgMultiplier = 1.f;
+        
+        float totalIncDmg = 0.f;
+        float totalIncRadius = 0.f;
+        
+        //TODO: count passives
+        
+        if(auto* links = manager.getComponent<LinkedGems>(ge)) {
+          for(auto se : links->gems) {
+            if(auto* sg = manager.getComponent<SupGem>(se)) {
+              if(m_skillDB->supSkills.count(sg->supIdHash)) {
+                m_skillDB->supSkills[sg->supIdHash].applyMods(*gem, sg->lvl);
+              }
+            }
+          }
+        }
+        
+        if(gem->tagsMask & SkillTag::Fire) {
+          totalIncDmg += pStats->incFireDmg;
+        }
+        if(gem->tagsMask & SkillTag::Cold) {
+          totalIncDmg += pStats->incColdDmg;
+        }
+        if(gem->tagsMask & SkillTag::AoE) {
+          totalIncRadius += pStats->incAoERadius;
+        }
+        //TODO: other mods
+        
+        gem->finalDmg = gem->finalDmg * (1.f + totalIncDmg) * gem->dmgMultiplier;
+        gem->finalRadius = gem->finalRadius * (1.f + totalIncRadius);
+        
+        if (gem->spawnedEnt != ecs::NULL_ENT) {
+          if (auto* dmg = manager.getComponent<DamageDealer>(gem->spawnedEnt)) {
+            dmg->amount = gem->finalDmg;
+          }
+          if (auto* col = manager.getComponent<CircleCollider>(gem->spawnedEnt)) {
+            col->radius = gem->finalRadius;
+          }
+          if (auto* kin = manager.getComponent<Kinematics>(gem->spawnedEnt)) {
+            kin->scale = {gem->finalRadius * 2.f, gem->finalRadius * 2.f};
+          }
+          if (auto* pulse = manager.getComponent<PulseCooldown>(gem->spawnedEnt)) {
+            pulse->maxTimer = gem->finalCd;
+          }
+        }
+        
+        manager.removeComponent<DirtyStatsTag>(ge);
+      }
+    }
+  };
+  
+  class CombatSystem : public ecs::ISystem {
+    SkillDB* m_skillDB;
+    GLFWwindow* m_wnd;
+    
+  public:
+    CombatSystem(SkillDB* db, GLFWwindow* wnd) : m_skillDB(db), m_wnd(wnd) {}
+    
+    void update(ecs::Manager& manager, const float dT) override {
+      ecs::EntID pe = ecs::NULL_ENT;
+      glm::vec2 pos{0.f};
+      for(auto e : manager.view<PlayerTag>().getOwners()) {
+        pe = e;
+        pos = manager.getComponent<Kinematics>(pe)->pos;
+        break;
+      }
+      if(pe == ecs::NULL_ENT) return;
+      
+      //TODO: fire dir, cast etc
+      bool isClicking = glfwGetMouseButton(m_wnd, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+      double x, y;
+      glfwGetCursorPos(m_wnd, &x, &y);
+      glm::vec2 targetDir{static_cast<float>(x), static_cast<float>(y)};
+      
+      for(auto ge :  manager.view<ActiveSkillGem>().getOwners()) {
+        auto* gem = manager.getComponent<ActiveSkillGem>(ge);
+        auto* item = manager.getComponent<InventoryItem>(ge);
+        if(!item || !item->isEquipped || item->owner != pe) continue;
+        if(!m_skillDB->activeSkills.count(gem->skillIdHash)) continue;
+        
+        const auto& config = m_skillDB->activeSkills[gem->skillIdHash];
+        
+        if(config.castType == CastType::Persistent && isClicking) {
+          if(gem->spawnedEnt == ecs::NULL_ENT) {
+            gem->spawnedEnt = config.buildPrefub(manager, pos, {0.f, 0.f}, *gem);
+            manager.addComponent(gem->spawnedEnt, AttachTo{.target = pe});
+          }
+          else {
+            if(auto* act = manager.getComponent<Active>(gem->spawnedEnt)) act->value = !act->value;
+          }
+          continue;
+        }
+        
+        if(config.castType == CastType::Continuous) {
+          if(gem->curCdTimer > 0.f) gem->curCdTimer -= dT;
+          
+          if(isClicking && gem->curCdTimer <= 0.f) {
+            for(int i = 0; i < gem->finalProj; ++i) {
+              glm::vec2 vel = glm::normalize(targetDir) * 300.f;
+              config.buildPrefub(manager, pos, vel, *gem);
+            }
+            gem->curCdTimer = gem->finalCd;
+          }
+        }
+      }
+    }
   };
   
   class StatusSystem : public ecs::ISystem {

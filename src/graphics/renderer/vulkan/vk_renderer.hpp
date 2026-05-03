@@ -24,7 +24,7 @@ namespace mip {
       glm::mat4 model;
       glm::vec4 uvRect;
       glm::vec4 color;
-      glm::ivec4 options;
+      uint32_t options;
     };
     
     std::shared_ptr<IMesh> m_globQuad{nullptr}; // for 2D optimization

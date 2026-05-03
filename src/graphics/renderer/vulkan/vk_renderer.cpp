@@ -286,7 +286,7 @@ namespace mip {
       .model = info.transform,
       .uvRect = info.uvRect,
       .color = info.color,
-      .options = info.options
+      .options = info.options.x == 1 ? (1u << 0) : 0 
     };
     vk::PushConstantsInfo pcInfo{
       .layout = vkMaterial->getPipLayout(),

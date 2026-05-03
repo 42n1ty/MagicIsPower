@@ -28,7 +28,7 @@ struct PushConstants {
     float4x4 model;
     float4 uvRect; // x,y - offset, z,w - scale
     float4 color;
-    int4 options; // x for UI
+    uint options; // 0001 for UI
 };
 [[vk::push_constant]] PushConstants pc; //pushconstants in VulkanMaterial::init
 
@@ -54,7 +54,7 @@ VSOutput vertMain(VSInput input) {
     //anim==========
     
     float4 worldPos = mul(pc.model, float4(input.inPos, 0.f, 1.f));
-    if(pc.options.x == 1) {
+    if((pc.options & 1) != 0) {
       output.pos = mul(camera.proj, worldPos);
     }
     else {

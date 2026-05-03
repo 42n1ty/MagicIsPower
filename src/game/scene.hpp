@@ -14,61 +14,73 @@ namespace game {
   class Scene {
     
     std::unique_ptr<ecs::Manager> m_manager = nullptr;
+    std::unique_ptr<SkillDB> m_skillDB = nullptr;
     float scrW, scrH;
     
     bool regComponents() {
-      m_manager->registerComponent<game::BgTile>();
-      m_manager->registerComponent<game::Script>();
+      m_manager->registerComponent<BgTile>();
+      m_manager->registerComponent<Script>();
       
-      m_manager->registerComponent<game::PlayerTag>();
-      m_manager->registerComponent<game::Kinematics>();
-      m_manager->registerComponent<game::Sprite>();
-      m_manager->registerComponent<game::ColorTint>();
-      m_manager->registerComponent<game::FlashEffect>();
-      m_manager->registerComponent<game::Animator>();
+      m_manager->registerComponent<PlayerTag>();
+      m_manager->registerComponent<DirtyStatsTag>();
+      m_manager->registerComponent<SkillTag>();
+      m_manager->registerComponent<InventoryItem>();
+      m_manager->registerComponent<PlayerStats>();
+      m_manager->registerComponent<PermanentStats>();
+      m_manager->registerComponent<ActiveSkillGem>();
+      m_manager->registerComponent<SupGem>();
+      m_manager->registerComponent<LinkedGems>();
+      m_manager->registerComponent<Kinematics>();
+      m_manager->registerComponent<Sprite>();
+      m_manager->registerComponent<ColorTint>();
+      m_manager->registerComponent<FlashEffect>();
+      m_manager->registerComponent<Animator>();
       
-      m_manager->registerComponent<game::Exp>();
-      m_manager->registerComponent<game::GameState>();
-      m_manager->registerComponent<game::UITag>();
-      m_manager->registerComponent<game::UIProgressBar>();
-      m_manager->registerComponent<game::BarType>();
-      m_manager->registerComponent<game::UIAnchor>();
-      m_manager->registerComponent<game::AnchorH>();
-      m_manager->registerComponent<game::AnchorV>();
+      m_manager->registerComponent<Exp>();
+      m_manager->registerComponent<GameState>();
+      m_manager->registerComponent<UITag>();
+      m_manager->registerComponent<UIProgressBar>();
+      m_manager->registerComponent<BarType>();
+      m_manager->registerComponent<UIAnchor>();
+      m_manager->registerComponent<AnchorH>();
+      m_manager->registerComponent<AnchorV>();
       
-      m_manager->registerComponent<game::EnemyTag>();
-      m_manager->registerComponent<game::WeaponTag>();
-      m_manager->registerComponent<game::Active>();
-      m_manager->registerComponent<game::CircleCollider>();
-      m_manager->registerComponent<game::Health>();
-      m_manager->registerComponent<game::DamageDealer>();
-      m_manager->registerComponent<game::PulseCooldown>();
-      m_manager->registerComponent<game::Lifetime>();
-      m_manager->registerComponent<game::AttachTo>();
-      m_manager->registerComponent<game::Pierce>();
+      m_manager->registerComponent<EnemyTag>();
+      m_manager->registerComponent<WeaponTag>();
+      m_manager->registerComponent<Active>();
+      m_manager->registerComponent<CircleCollider>();
+      m_manager->registerComponent<Health>();
+      m_manager->registerComponent<DamageDealer>();
+      m_manager->registerComponent<Resistances>();
+      m_manager->registerComponent<PulseCooldown>();
+      m_manager->registerComponent<Lifetime>();
+      m_manager->registerComponent<AttachTo>();
+      m_manager->registerComponent<Pierce>();
       
       return true;
     }
     bool regAssets(mip::IRenderer* rend) {
-      game::TextureLoader tLoader{rend};
+      TextureLoader tLoader{rend};
       m_manager->registerAsset<std::shared_ptr<mip::ITexture>>(tLoader);
       
       return true;
     }
     bool regSystems(GLFWwindow* wnd, mip::IRenderer* rend) {
-      m_manager->registerSystem<game::PlayerControllerSystem>(wnd);
-      m_manager->registerSystem<game::TileSystem>();
-      // m_manager->registerSystem<game::PatrolSystem>();
-      m_manager->registerSystem<game::MovementSystem>();
-      m_manager->registerSystem<game::AttachmentSystem>();
-      m_manager->registerSystem<game::DamageSystem>();
-      m_manager->registerSystem<game::LifetimeSystem>();
-      m_manager->registerSystem<game::VisualEffectsSystem>();
-      m_manager->registerSystem<game::AnimSystem>();
-      m_manager->registerSystem<game::EnemySpawnerSystem>(rend);
-      m_manager->registerSystem<game::UISystem>(wnd);
-      m_manager->registerSystem<game::GamePlayUISystem>();
-      m_manager->registerSystem<game::RenderSystem>(rend);
+      m_manager->registerSystem<PlayerControllerSystem>(wnd);
+      m_manager->registerSystem<TileSystem>();
+      // m_manager->registerSystem<PatrolSystem>();
+      m_manager->registerSystem<MovementSystem>();
+      m_manager->registerSystem<AttachmentSystem>();
+      m_manager->registerSystem<LifetimeSystem>();
+      m_manager->registerSystem<StatCalcSystem>(m_skillDB.get());
+      m_manager->registerSystem<DamageSystem>();
+      m_manager->registerSystem<CombatSystem>(m_skillDB.get(), wnd);
+      m_manager->registerSystem<VisualEffectsSystem>();
+      m_manager->registerSystem<AnimSystem>();
+      m_manager->registerSystem<EnemySpawnerSystem>(rend);
+      m_manager->registerSystem<UISystem>(wnd);
+      m_manager->registerSystem<GamePlayUISystem>();
+      m_manager->registerSystem<RenderSystem>(rend);
       
       return true;
     }
@@ -84,39 +96,39 @@ namespace game {
       
       // hp
       auto hpBg = m_manager->createEntity();
-      auto hpAtt = m_manager->addComponent(hpBg, game::AttachTo{ .target = player, .offset = {-30.f, -60.f} });
-      auto hpKin = m_manager->addComponent(hpBg, game::Kinematics{ .scale = {60.f, 8.f}, .z = 99 });
-      m_manager->addComponent(hpBg, game::ColorTint{ .baseColor = {0.1f, 0.1f, 0.1f, 1.f} });
-      m_manager->addComponent(hpBg, game::Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+      auto hpAtt = m_manager->addComponent(hpBg, AttachTo{ .target = player, .offset = {-30.f, -60.f} });
+      auto hpKin = m_manager->addComponent(hpBg, Kinematics{ .z = 99, .scale = {60.f, 8.f} });
+      m_manager->addComponent(hpBg, ColorTint{ .baseColor = {0.1f, 0.1f, 0.1f, 1.f} });
+      m_manager->addComponent(hpBg, Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
 
       auto hpFill = m_manager->createEntity();
-      m_manager->addComponent(hpFill, game::UIProgressBar{ .bType = game::BarType::HP, .maxW = 60.f });
-      m_manager->addComponent(hpFill, game::AttachTo{hpAtt});
-      m_manager->addComponent(hpFill, game::Kinematics{ .scale = hpKin.scale, .z = 100 });
-      m_manager->addComponent(hpFill, game::ColorTint{ .baseColor = {1.f, 0.f, 0.f, 1.f} });
-      m_manager->addComponent(hpFill, game::Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+      m_manager->addComponent(hpFill, UIProgressBar{ .bType = BarType::HP, .maxW = 60.f });
+      m_manager->addComponent(hpFill, AttachTo{hpAtt});
+      m_manager->addComponent(hpFill, Kinematics{ .z = 100, .scale = hpKin.scale });
+      m_manager->addComponent(hpFill, ColorTint{ .baseColor = {1.f, 0.f, 0.f, 1.f} });
+      m_manager->addComponent(hpFill, Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
 
       // exp
-      game::UIAnchor expAnchor {
-        .hAlign = game::AnchorH::Stretch, 
-        .vAlign = game::AnchorV::Bottom, 
+      UIAnchor expAnchor {
+        .hAlign = AnchorH::Stretch, 
+        .vAlign = AnchorV::Bottom, 
         .padding = {10.f, 10.f}
       };
 
       auto expBg = m_manager->createEntity();
-      m_manager->addComponent(expBg, game::UITag{});
-      m_manager->addComponent(expBg, game::UIAnchor{expAnchor});
-      m_manager->addComponent(expBg, game::Kinematics{ .z = 99 });
-      m_manager->addComponent(expBg, game::ColorTint{ .baseColor = {0.1f, 0.2f, 0.4f, 1.f} });
-      m_manager->addComponent(expBg, game::Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+      m_manager->addComponent(expBg, UITag{});
+      m_manager->addComponent(expBg, UIAnchor{expAnchor});
+      m_manager->addComponent(expBg, Kinematics{ .z = 99 });
+      m_manager->addComponent(expBg, ColorTint{ .baseColor = {0.1f, 0.2f, 0.4f, 1.f} });
+      m_manager->addComponent(expBg, Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
 
       auto expFill = m_manager->createEntity();
-      m_manager->addComponent(expFill, game::UITag{});
-      m_manager->addComponent(expFill, game::UIAnchor{expAnchor});
-      m_manager->addComponent(expFill, game::UIProgressBar{ .bType = game::BarType::EXP });
-      m_manager->addComponent(expFill, game::Kinematics{ .z = 100 });
-      m_manager->addComponent(expFill, game::ColorTint{ .baseColor = {0.2f, 0.3f, 1.f, 1.f} });
-      m_manager->addComponent(expFill, game::Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+      m_manager->addComponent(expFill, UITag{});
+      m_manager->addComponent(expFill, UIAnchor{expAnchor});
+      m_manager->addComponent(expFill, UIProgressBar{ .bType = BarType::EXP });
+      m_manager->addComponent(expFill, Kinematics{ .z = 100 });
+      m_manager->addComponent(expFill, ColorTint{ .baseColor = {0.2f, 0.3f, 1.f, 1.f} });
+      m_manager->addComponent(expFill, Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
       
       return true;
     }
@@ -128,6 +140,8 @@ namespace game {
     }
     
     bool init(mip::Window* wnd, mip::IRenderer* rend) {
+      m_skillDB = std::make_unique<SkillDB>(rend);
+      
       if(
            !regComponents()
         || !regAssets(rend)
@@ -146,8 +160,8 @@ namespace game {
       // ImGui::ShowDemoWindow();
       
       glm::vec2 playerPos{0.f, 0.f};
-      auto& ks = m_manager->view<game::Kinematics>();
-      auto& ps = m_manager->view<game::PlayerTag>();
+      auto& ks = m_manager->view<Kinematics>();
+      auto& ps = m_manager->view<PlayerTag>();
       for(auto e : ps.getOwners()) {
         playerPos = ks.get(e)->pos;
         break;
@@ -166,7 +180,7 @@ namespace game {
       vkRend->renderImGui();
       if(!rend->endFrame()) return false;
       
-      if(auto* ph = m_manager->getComponent<game::Health>(ps.getOwners()[0]); ph->cur <= 0) {
+      if(auto* ph = m_manager->getComponent<Health>(ps.getOwners()[0]); ph->cur <= 0) {
         Logger::debug("Player died!");
         return false;
       }
@@ -176,11 +190,11 @@ namespace game {
     
     bool createLevel(float width, float height, mip::IRenderer* rend, const std::string& txtrPath) {
       auto map = m_manager->createEntity();
-      m_manager->addComponent(map, game::Kinematics{
+      m_manager->addComponent(map, Kinematics{
+        .z = 0,
         .pos = {width / 2, height / 2},
         .scale = {width, height},
-        .rot = 0.f,
-        .z = 0
+        .rot = 0.f
       });
       auto texHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);
       auto mapMat = rend->createMaterial("../../assets/shaders/shader.spv");
@@ -191,7 +205,7 @@ namespace game {
       if (auto tex = m_manager->getAsset(texHandle)) {
         mapMat->setTexture(0, *tex);
       }
-      m_manager->addComponent(map, game::Sprite{
+      m_manager->addComponent(map, Sprite{
         .mesh = rend->getGlobalQuad(),
         .material = mapMat
       });
@@ -212,13 +226,13 @@ namespace game {
       for(int x = -1; x <= 1; ++x) {
         for(int y = -1; y <= 1; ++y) {
           auto tile = m_manager->createEntity();
-          m_manager->addComponent(tile, game::Kinematics{
+          m_manager->addComponent(tile, Kinematics{
+            .z = 0,
             .pos = {0.f, 0.f},
-            .scale = {game::TileSystem::tileSize, game::TileSystem::tileSize},
-            .z = 0
+            .scale = {TileSystem::tileSize, TileSystem::tileSize}
           });
-          m_manager->addComponent(tile, game::BgTile{.offset = {static_cast<float>(x), static_cast<float>(y)}});
-          m_manager->addComponent(tile, game::Sprite{
+          m_manager->addComponent(tile, BgTile{.offset = {static_cast<float>(x), static_cast<float>(y)}});
+          m_manager->addComponent(tile, Sprite{
             .mesh = rend->getGlobalQuad(),
             .material = tileMat
           });
@@ -229,18 +243,20 @@ namespace game {
     }
     bool createPlayer(float x, float y, mip::IRenderer* rend, const std::string& txtrPath) {
       auto player = m_manager->createEntity();
-      m_manager->addComponent(player, game::PlayerTag{});
-      m_manager->addComponent(player, game::GameState{});
-      m_manager->addComponent(player, game::Kinematics{
+      m_manager->addComponent(player, PlayerTag{});
+      m_manager->addComponent(player, GameState{});
+      m_manager->addComponent(player, PlayerStats{});
+      m_manager->addComponent(player, PermanentStats{});
+      m_manager->addComponent(player, Kinematics{
+        .z = 10,
         .pos = {x, y},
         .scale = {100.f, 100.f},
         .rot = 0.f,
-        .speed = 300.f,
-        .z = 10
+        .speed = 300.f
       });
-      auto pCol = m_manager->addComponent(player, game::CircleCollider{.radius = m_manager->getComponent<Kinematics>(player)->scale.x / 2.f});
-      m_manager->addComponent(player, game::Health{.max = 100.f});
-      m_manager->getComponent<game::Health>(player)->cur = m_manager->getComponent<game::Health>(player)->max;
+      auto pCol = m_manager->addComponent(player, CircleCollider{.radius = m_manager->getComponent<Kinematics>(player)->scale.x / 2.f});
+      m_manager->addComponent(player, Health{.max = 100.f});
+      m_manager->getComponent<Health>(player)->cur = m_manager->getComponent<Health>(player)->max;
       
       auto texHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);
       auto playerMat = rend->createMaterial("../../assets/shaders/shader.spv");
@@ -251,16 +267,16 @@ namespace game {
       if (auto tex = m_manager->getAsset(texHandle)) {
         playerMat->setTexture(0, *tex);
       }
-      m_manager->addComponent(player, game::Sprite{
+      m_manager->addComponent(player, Sprite{
         .mesh = rend->getGlobalQuad(),
         .material = playerMat,
       });
-      m_manager->addComponent(player, game::ColorTint{});
-      m_manager->addComponent(player, game::Exp{.cur = 5.f});
+      m_manager->addComponent(player, ColorTint{});
+      m_manager->addComponent(player, Exp{.cur = 5.f});
       
       if(!createBars(x, y, player, rend)) return false;
       
-      m_manager->addComponent(player, game::Animator{
+      m_manager->addComponent(player, Animator{
         .cols = 4,
         .rows = 1,
         .startFrame = 0,
@@ -269,45 +285,28 @@ namespace game {
       });
       
       
-      auto aura = m_manager->createEntity();
-      auto ps = m_manager->view<game::PlayerTag>().getOwners()[0];
-      m_manager->addComponent(aura, game::WeaponTag{});
-      m_manager->addComponent(aura, game::DamageDealer{.amount = 10.f});
-      m_manager->addComponent(aura, game::PulseCooldown{.maxTimer = 0.5});
-      m_manager->getComponent<game::PulseCooldown>(aura)->curTimer = m_manager->getComponent<game::PulseCooldown>(aura)->maxTimer;
-      m_manager->addComponent(aura, game::Kinematics{
-        .pos = m_manager->getComponent<game::Kinematics>(ps)->pos,
-        .scale = {500.f, 500.f},
-        .z = 8
+      auto auraGem = m_manager->createEntity();
+      m_manager->addComponent(auraGem, ActiveSkillGem{
+        .skillIdHash = Hash("aura"),
+        .lvl = 1
       });
-      m_manager->addComponent(aura, game::AttachTo{.target = ps});
-      m_manager->addComponent(aura, game::CircleCollider{.radius = m_manager->getComponent<Kinematics>(aura)->scale.x / 2.f});
-      auto auraTex = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>("../../assets/textures/222.png");
-      auto auraMat = rend->createMaterial("../../assets/shaders/shader.spv");
-      if(!auraMat) {
-        Logger::error("Failed to create material for aura!");
-        return false;
-      }
-      if (auto tex = m_manager->getAsset(auraTex)) {
-        auraMat->setTexture(0, *tex);
-      }
-      m_manager->addComponent(aura, game::Sprite{
-        .mesh = rend->getGlobalQuad(),
-        .material = auraMat
+      m_manager->addComponent(auraGem, InventoryItem{
+        .owner = player,
+        .isEquipped = true
       });
-      
+      m_manager->addComponent(auraGem, DirtyStatsTag{});
       
       return true;
     }
     bool createMobs(float x, float y, mip::IRenderer* rend, const std::string& txtrPath) {
       auto mob = m_manager->createEntity();
-      m_manager->addComponent(mob, game::Kinematics{
+      m_manager->addComponent(mob, Kinematics{
+        .z = 1,
         .pos = {x, y},
         .scale = {50, 50},
-        .rot = 0.f,
-        .z = 1
+        .rot = 0.f
       });
-      m_manager->addComponent(mob, game::Script{.task = game::squarePatrol(*m_manager, mob, 2.f, 3.f, 150.f)});
+      m_manager->addComponent(mob, Script{.task = squarePatrol(*m_manager, mob, 2.f, 3.f, 150.f)});
       
       auto texHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);
       auto mobMat = rend->createMaterial("../../assets/shaders/shader.spv");
@@ -318,7 +317,7 @@ namespace game {
       if (auto tex = m_manager->getAsset(texHandle)) {
         mobMat->setTexture(0, *tex);
       }
-      m_manager->addComponent(mob, game::Sprite{
+      m_manager->addComponent(mob, Sprite{
         .mesh = rend->getGlobalQuad(),
         .material = mobMat
       });

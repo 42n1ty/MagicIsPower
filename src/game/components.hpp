@@ -10,14 +10,18 @@
 
 namespace game {
   
+  constexpr uint32_t Hash(const char* str, uint32_t hash = 2166136261u) {
+    return *str ? Hash(str + 1, (hash ^ static_cast<uint32_t>(*str)) * 16777619u) : hash;
+  }
+  
   struct Kinematics {
+    uint8_t z = 0; //1
     glm::vec2 pos{0.f, 0.f}; //4+4
     glm::vec2 scale{10.f, 10.f}; //pixels //4+4
     glm::vec2 vel = {0.f, 0.f}; //4+4
     float rot = 0.f; //degrees //4
     float speed; //4
-    uint32_t z = 0; //4
-  }; //36
+  }; //33
   
   struct Sprite {
     // ecs::Handle<std::shared_ptr<mip::ITexture>> texHandle;
@@ -40,17 +44,16 @@ namespace game {
   
   struct Animator {
     // sprite-sheet grid
-    int cols = 1;
-    int rows = 1;
+    uint8_t cols = 1;
+    uint8_t rows = 1;
     
-    // current anim
-    int startFrame = 0;
-    int frameCnt = 1;
-    float frameTime = 0.05f;
+    uint16_t startFrame = 0;
+    uint16_t frameCnt = 1;
+    uint16_t curFrame = 0;
+    
     bool loop = true;
     
-    // current state
-    int curFrame = 0;
+    float frameTime = 0.05f;
     float timer = 0.f;
     
     void play(int start, int count, float speed, bool isLoop = true) {
@@ -62,7 +65,7 @@ namespace game {
       curFrame = 0;
       timer = 0.f;
     }
-  }; //32
+  }; //16
   
   struct CircleCollider {
     float radius;
@@ -82,6 +85,92 @@ namespace game {
   struct EnemyTag {};
   struct WeaponTag {};
   struct Active { bool value = true; };
+  enum SkillTag : uint32_t {
+    None = 0,
+    Fire       = 1 << 0,
+    Water      = 1 << 1,
+    Earth      = 1 << 2,
+    Air        = 1 << 3,
+    Cold       = 1 << 4,
+    Lightning  = 1 << 5,
+    Aura       = 1 << 6,
+    AoE        = 1 << 7,
+    Projectile = 1 << 8,
+  };
+  struct DirtyStatsTag {};
+  struct InventoryItem {
+    ecs::EntID owner = ecs::NULL_ENT;
+    bool isEquipped = false;
+  };
+  struct PlayerStats {
+    //TODO: fixed percentage in uint16_t instead of float to minimize size ???
+    float incFireDmg = 0.f;
+    float incColdDmg = 0.f;
+    float incAoERadius = 0.f;
+    float cdReduction = 0.f;
+    uint32_t extraProj = 0;
+  }; //20
+  struct PermanentStats {
+    float incFireDmg = 0.f;
+    float incColdDmg = 0.f;
+    float incAoERadius = 0.f;
+    float cdReduction = 0.f;
+    uint32_t extraProj = 0;
+  }; //
+  struct ActiveSkillGem {
+    uint32_t skillIdHash;
+    uint32_t tagsMask;
+    int lvl = 1;
+    
+    float finalDmg = 0.f;
+    float finalCd = 0.f;
+    float finalRadius = 0.f;
+    uint32_t finalProj = 0;
+    
+    float curCdTimer = 0.f;
+    float dmgMultiplier = 1.f;
+    float curLvlDmg = 0.f; //actually unused except for GamePlayUISystem
+    
+    ecs::EntID spawnedEnt = ecs::NULL_ENT;
+  }; //44
+  struct SupGem {
+    uint32_t supIdHash;
+    int lvl = 1;
+  };
+  struct LinkedGems {
+    ecs::EntID gems[7] = {
+      ecs::NULL_ENT,
+      ecs::NULL_ENT,
+      ecs::NULL_ENT,
+      ecs::NULL_ENT,
+      ecs::NULL_ENT,
+      ecs::NULL_ENT,
+      ecs::NULL_ENT
+    };
+    uint8_t max = 3;
+    uint8_t cur = 0;
+    
+    bool add(ecs::EntID sup) {
+      if(cur < max) {
+        gems[cur++] = sup;
+        return true;
+      }
+      return false;
+    }
+    bool remove(ecs::EntID sup) {
+      if(cur > 0) {
+        for(auto s : gems) {
+          if(s == sup) {
+            std::swap(s, gems[cur]);
+            gems[cur] = ecs::NULL_ENT;
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+  }; //29
+  
   
   struct UITag {};
   enum class BarType{HP, EXP};
@@ -96,7 +185,7 @@ namespace game {
     AnchorV vAlign = AnchorV::Center;
     glm::vec2 padding{0.f, 0.f};
     glm::vec2 baseSize{100.f, 8.f};
-  };
+  }; //2+4=6
   
   struct Exp {
     float cur = 0.f;
@@ -115,8 +204,23 @@ namespace game {
     float iFrames = 0.f;
   }; //12
   
+  struct AttachTo {
+    ecs::EntID target;
+    glm::vec2 offset{0.f, 0.f};
+  }; //12
+  
   struct DamageDealer {
     float amount;
+    SkillTag dmgType;
+    float pen = 0.f;
+  }; //12
+  struct Resistances {
+    float fire = 0.f;
+    float water = 0.f;
+    float earth = 0.f;
+    float air = 0.f;
+    float cold = 0.f;
+    float lightning = 0.f;
   };
   
   struct PulseCooldown {
@@ -145,11 +249,6 @@ namespace game {
     float curTimer;
     float maxTimer;
   };
-  
-  struct AttachTo {
-    ecs::EntID target;
-    glm::vec2 offset{0.f, 0.f};
-  }; //12
   
   struct Pierce {
     int count = 1;
