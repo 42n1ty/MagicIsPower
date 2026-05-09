@@ -15,6 +15,7 @@ namespace game {
     
     std::unique_ptr<ecs::Manager> m_manager = nullptr;
     std::unique_ptr<SkillDB> m_skillDB = nullptr;
+    std::unique_ptr<ChunkedMA> m_frameArena = nullptr;
     float scrW, scrH;
     
     bool regComponents() {
@@ -73,7 +74,7 @@ namespace game {
       m_manager->registerSystem<AttachmentSystem>();
       m_manager->registerSystem<LifetimeSystem>();
       m_manager->registerSystem<StatCalcSystem>(m_skillDB.get());
-      m_manager->registerSystem<DamageSystem>();
+      m_manager->registerSystem<DamageSystem>(m_frameArena.get());
       m_manager->registerSystem<CombatSystem>(m_skillDB.get(), wnd);
       m_manager->registerSystem<VisualEffectsSystem>();
       m_manager->registerSystem<AnimSystem>();
@@ -133,10 +134,12 @@ namespace game {
       return true;
     }
     
+    
   public:
     
     Scene() {
       m_manager = std::make_unique<ecs::Manager>();
+      m_frameArena = std::make_unique<ChunkedMA>();
     }
     
     bool init(mip::Window* wnd, mip::IRenderer* rend) {
@@ -154,6 +157,8 @@ namespace game {
     
     bool update(const float dT, mip::IRenderer* rend, const float w, const float h) {
       
+      m_frameArena->reset();
+      
       // ImGui
       auto* vkRend = static_cast<mip::VulkanRenderer*>(rend);
       vkRend->beginImGuiFrame();
@@ -166,6 +171,7 @@ namespace game {
         playerPos = ks.get(e)->pos;
         break;
       }
+      
       mip::CameraInfo camData{};
       camData.projection = glm::ortho(0.f, static_cast<float>(w), static_cast<float>(h), 0.f, -1.f, 1.f);
       float centerX = w / 2.f;
@@ -272,7 +278,7 @@ namespace game {
         .material = playerMat,
       });
       m_manager->addComponent(player, ColorTint{});
-      m_manager->addComponent(player, Exp{.cur = 5.f});
+      m_manager->addComponent(player, Exp{.cur = 5});
       
       if(!createBars(x, y, player, rend)) return false;
       

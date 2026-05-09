@@ -3,3 +3,5 @@
 /rel/
 *.zip
 # /bin/
+assets/shaders/*.frag
+assets/shaders/*.vert

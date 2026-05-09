@@ -67,10 +67,10 @@ namespace mip {
       
       processInput(m_window->getWindow(), deltaTime);
       
-      CameraInfo camData{};
-      camData.pos = glm::vec3(0.f);
-      camData.view = glm::mat4(1.f);
-      camData.projection = glm::ortho(0.f, static_cast<float>(m_window->m_width), 0.f, static_cast<float>(m_window->m_height), -1.f, 1.f);
+      // CameraInfo camData{};
+      // camData.pos = glm::vec3(0.f);
+      // camData.view = glm::mat4(1.f);
+      // camData.projection = glm::ortho(0.f, static_cast<float>(m_window->m_width), 0.f, static_cast<float>(m_window->m_height), -1.f, 1.f);
       
       // if(!m_renderer->beginFrame(camData)) break;
       

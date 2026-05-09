@@ -4,9 +4,11 @@
 #include <imgui.h>
 
 #include "../common/ecs_core.hpp"
+#include <../common/chunked_ma.hpp>
 #include "skills_db.hpp"
 #include "../graphics/i_renderer.hpp"
 #include "../graphics/i_material.hpp"
+
 
 
 namespace game {
@@ -208,7 +210,7 @@ namespace game {
             break;
           }
           case BarType::EXP: {
-            percent = std::max(pexp->cur / pexp->max, 0.f);
+            percent = std::max(pexp->cur / pexp->max, 0u);
             break;
           }
           default: break;
@@ -664,9 +666,29 @@ namespace game {
   
   class DamageSystem : public ecs::ISystem {
     
+    struct GridNode {
+      ecs::EntID e;
+      GridNode* next;
+    };
+    
+    static const int HASH_SIZE = 4096;
+    GridNode* m_hashTable[HASH_SIZE];
+    ChunkedMA* m_arena{nullptr};
+    
     std::vector<ecs::EntID> m_toDestroy;
     
+    inline int getHash(int cx, int cy) {
+      uint32_t hash = (static_cast<uint32_t>(cx) * 73856093u) ^ (static_cast<uint32_t>(cy) * 19349663u);
+      return hash % HASH_SIZE;
+    }
+    
   public:
+    
+    DamageSystem(ChunkedMA* arena)
+    : m_arena((arena)) {
+      m_toDestroy.reserve(100);
+    }
+    
     void update(ecs::Manager& manager, const float dT) override {
       
       //check game state
@@ -688,78 +710,127 @@ namespace game {
       auto& pulses = manager.view<PulseCooldown>();
       auto& players = manager.view<PlayerTag>();
       
+      memset(m_hashTable, 0, sizeof(m_hashTable));
+      
+      const float CELLSIZE = 100.f; //need to be more than the biggest enemy radius
+      
+      for(auto ee : enemies.getOwners()) {
+        auto* eact = acts.get(ee);
+        if(eact && !eact->value) continue;
+        
+        auto* ek = ks.get(ee);
+        if(!ek) continue;
+        
+        int cx = static_cast<int>(std::floorf(ek->pos.x / CELLSIZE));
+        int cy = static_cast<int>(std::floorf(ek->pos.y / CELLSIZE));
+        
+        int hash = getHash(cx, cy);
+        
+        GridNode* node = m_arena->alloc<GridNode>();
+        node->e = ee;
+        node->next = m_hashTable[hash];
+        m_hashTable[hash] = node;
+      }
       
       // 1st iter by weapons
       for(auto we : dds.getOwners()) {
         auto* wact = acts.get(we);
         if(wact && !wact->value) continue;
+        
         auto* pulse = pulses.get(we);
         if(pulse && pulse->curTimer > 0.f) continue;
+        
         auto* wc = circles.get(we);
-        auto* wt = ks.get(we);
-        if(!wc || !wt) continue;
+        auto* wk = ks.get(we);
         auto* dmg = dds.get(we);
+        if(!wc || !wk || !dmg) continue;
+        
+        // cell coords of dd
+        int minx = static_cast<int>(std::floorf((wk->pos.x - wc->radius) / CELLSIZE));
+        int maxx = static_cast<int>(std::floorf((wk->pos.x + wc->radius) / CELLSIZE));
+        int miny = static_cast<int>(std::floorf((wk->pos.y - wc->radius) / CELLSIZE));
+        int maxy = static_cast<int>(std::floorf((wk->pos.y + wc->radius) / CELLSIZE));
         
         // 2nd iter by enemies
-        for(auto ee : enemies.getOwners()) {
-          auto* eact = acts.get(ee);
-          if(eact && !eact->value) continue;
-          auto* ehp = healths.get(ee);
-          auto* ec = circles.get(ee);
-          auto* et = ks.get(ee);
-          if(!ec || !et) continue;
+        auto checkCollisions = [&](){
           
-          float finalDmg = dmg->amount;
-          // if(auto* res = manager.getComponent<Resistances>(ee)) {
-          //   float targetRes = 0.f;
-          //   if(dmg->dmgType == SkillTag::Fire) targetRes = res->fire;
-          //   else if(dmg->dmgType == SkillTag::Water) targetRes = res->water;
-          //   else if(dmg->dmgType == SkillTag::Air) targetRes = res->air;
-          //   else if(dmg->dmgType == SkillTag::Earth) targetRes = res->earth;
-          //   else if(dmg->dmgType == SkillTag::Cold) targetRes = res->cold;
-          //   else if(dmg->dmgType == SkillTag::Lightning) targetRes = res->lightning;
-            
-          //   targetRes -= dmg->pen;
-          //   targetRes = std::max(targetRes, 2.f);
-            
-          //   finalDmg *= (1.f - targetRes);
-          // }
-          
-          float dist = glm::distance(wt->pos, et->pos);
-          if(dist < (wc->radius + ec->radius)) {
-            if(pulse) {
-              if(pulse->curTimer <= 0.f) {
-                ehp->cur -= finalDmg;
-              }
-            }
-            else ehp->cur -= finalDmg; // once damage
-            // flash effect after gaining damage
-            float time = 0.2f;
-            manager.addComponent(ee, FlashEffect{ .maxTime = time, .curTime = time, .color = {1.f, 0.f, 0.f, 1.f} });
-            
-            if(auto* applies = manager.getComponent<AppliesDoT>(we)) {
-              auto* statuses = manager.getComponent<StatusEffects>(ee);
-              if(!statuses) {
-                statuses = &manager.addComponent(ee, StatusEffects{});
-              }
-              statuses->dots.emplace_back(DoTCharge{
-                .damage = applies->dmgPerTick,
-                .tickRate = applies->tickRate,
-                .curTickTimer = applies->tickRate,
-                .lifetime = applies->duration
-              });
-            }
-            
-            if(auto* pierce = manager.getComponent<Pierce>(we)) {
-              pierce->count--;
-              if(pierce->count <= 0) {
-                // wact->value = false;
-                m_toDestroy.emplace_back(we);
-                break;
+          for(int x = minx; x <= maxx; ++x) {
+            for(int y = miny; y <= maxy; ++y) {
+              
+              int hash = getHash(x, y);
+              GridNode* node = m_hashTable[hash];
+              
+              while(node != nullptr) {
+                ecs::EntID ee = node->e;
+                GridNode* nextNode = node->next;
+                
+                auto* eact = acts.get(ee);
+                auto* ehp = healths.get(ee);
+                if((eact && !eact->value) || (ehp && ehp->cur <= 0.f)) {
+                  node = nextNode;
+                  continue;
+                }
+                
+                auto* ec = circles.get(ee);
+                auto* ek = ks.get(ee);
+                if(!ec || !ek) {
+                  node = nextNode;
+                  continue;
+                }
+                
+                float finalDmg = dmg->amount;
+                // if(auto* res = manager.getComponent<Resistances>(ee)) {
+                //   float targetRes = 0.f;
+                //   if(dmg->dmgType == SkillTag::Fire) targetRes = res->fire;
+                //   else if(dmg->dmgType == SkillTag::Water) targetRes = res->water;
+                //   else if(dmg->dmgType == SkillTag::Air) targetRes = res->air;
+                //   else if(dmg->dmgType == SkillTag::Earth) targetRes = res->earth;
+                //   else if(dmg->dmgType == SkillTag::Cold) targetRes = res->cold;
+                //   else if(dmg->dmgType == SkillTag::Lightning) targetRes = res->lightning;
+                  
+                //   targetRes -= dmg->pen;
+                //   targetRes = std::max(targetRes, 2.f);
+                  
+                //   finalDmg *= (1.f - targetRes);
+                // }
+                
+                float dist = glm::distance(wk->pos, ek->pos);
+                if(dist < (wc->radius + ec->radius)) {
+                  ehp->cur -= finalDmg; // once damage
+                  // flash effect after gaining damage
+                  float time = 0.2f;
+                  manager.addComponent(ee, FlashEffect{ .maxTime = time, .curTime = time, .color = {1.f, 0.f, 0.f, 1.f} });
+                  
+                  if(auto* applies = manager.getComponent<AppliesDoT>(we)) {
+                    auto* statuses = manager.getComponent<StatusEffects>(ee);
+                    if(!statuses) {
+                      statuses = &manager.addComponent(ee, StatusEffects{});
+                    }
+                    statuses->dots.emplace_back(DoTCharge{
+                      .damage = applies->dmgPerTick,
+                      .tickRate = applies->tickRate,
+                      .curTickTimer = applies->tickRate,
+                      .lifetime = applies->duration
+                    });
+                  }
+                  
+                  if(auto* pierce = manager.getComponent<Pierce>(we)) {
+                    pierce->count--;
+                    if(pierce->count <= 0) {
+                      // wact->value = false;
+                      m_toDestroy.emplace_back(we);
+                      return;
+                    }
+                  }
+                }
+                
+                node = nextNode;
               }
             }
           }
-        }
+        };
+        
+        checkCollisions();
         
         if(pulse) pulse->curTimer = pulse->maxTimer;
       }
@@ -771,14 +842,14 @@ namespace game {
         auto* pc = circles.get(pe);
         for(auto ee : enemies.getOwners()) {
           auto* eact = acts.get(ee);
-          if(eact && !eact->value) continue;
           auto* ehp = healths.get(ee);
-          auto* ec = circles.get(ee);
-          auto* et = ks.get(ee);
+          if((eact && !eact->value) || (ehp && ehp->cur <= 0.f)) continue;
           
-          if(!ec || !et) continue;
+          auto* ec = circles.get(ee);
+          auto* ek = ks.get(ee);
+          if(!ec || !ek) continue;
         
-          float dist = glm::distance(pt->pos, et->pos);
+          float dist = glm::distance(pt->pos, ek->pos);
           if(dist < (pc->radius + ec->radius)) {
             ph->cur -= 5.f;
             if(auto* spr = manager.getComponent<Sprite>(pe)) {

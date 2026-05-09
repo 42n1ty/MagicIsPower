@@ -188,8 +188,8 @@ namespace game {
   }; //2+4=6
   
   struct Exp {
-    float cur = 0.f;
-    float max = 10.f;
+    uint32_t cur = 0;
+    uint32_t max = 10;
     uint32_t curLvl = 0;
     uint32_t maxLvl = 10;
   }; //16
