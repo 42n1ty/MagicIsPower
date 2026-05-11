@@ -82,9 +82,12 @@ namespace game {
         return a.z < b.z;
       });
       
-      for(const auto& item : rendQ) {
-        auto* active = manager.getComponent<Active>(item.e);
-        if(active && !active->value) continue;
+      auto validEs = rendQ | std::views::filter([&](RenderItem& item) {
+        auto* act = manager.getComponent<Active>(item.e);
+        return (!act || act->value);
+      });
+      
+      for(const auto& item : validEs) {
         auto* spr = sprites.get(item.e);
         auto* k = ks.get(item.e);
         auto* clr = clrs.get(item.e);
@@ -127,10 +130,16 @@ namespace game {
       auto& anchors = manager.view<UIAnchor>();
       
       // step 1: layout
-      for(auto ae : anchors.getOwners()) {
+      auto validAnchors  = anchors.getOwners() | std::views::filter([&](ecs::EntID ae) {
         auto* kin = ks.get(ae);
         auto* anch = anchors.get(ae);
-        if(!kin || ! anch) continue;
+        return (kin && anch);
+      });
+      // for(auto ae : anchors.getOwners()) {
+      for(auto ae : validAnchors) {
+        auto* kin = ks.get(ae);
+        auto* anch = anchors.get(ae);
+        // if(!kin || ! anch) continue;
         
         float outW = anch->baseSize.x;
         float outH = anch->baseSize.y;
@@ -156,7 +165,7 @@ namespace game {
             outW = (scrW - outW) / 2.f;
             break;
           }
-          default: break;
+          default: std::unreachable();
         }
         
         // v align, -0.5 < mesh.y < 0.5
@@ -174,7 +183,7 @@ namespace game {
             outY = scrH / 2.f;
             break;
           }
-          [[unreachable]] default: break;
+          default: std::unreachable();
         }
         
         kin->pos = {outX, outY};
@@ -198,10 +207,16 @@ namespace game {
       
       if(!ph || !pexp) return;
       
-      for(auto be : bars.getOwners()) {
+      auto validBars = bars.getOwners() | std::views::filter([&](ecs::EntID be) {
         auto* kin = ks.get(be);
         auto* bar = bars.get(be);
-        if(!kin || !bar) continue;
+        return kin && bar;
+      });
+      // for(auto be : bars.getOwners()) {
+      for(auto be : validBars) {
+        auto* kin = ks.get(be);
+        auto* bar = bars.get(be);
+        // if(!kin || !bar) continue;
         
         float percent;
         switch(bar->bType) {
@@ -210,12 +225,12 @@ namespace game {
             break;
           }
           case BarType::EXP: {
-            percent = std::max(pexp->cur / pexp->max, 0u);
+            percent = std::max((float)pexp->cur / (float)pexp->max, 0.f);
             break;
           }
-          default: break;
+          default: std::unreachable();
         }
-          kin->scale.x = bar->maxW * percent;
+        kin->scale.x = bar->maxW * percent;
       }
     }
   };
@@ -234,6 +249,8 @@ namespace game {
         exp = manager.getComponent<Exp>(pe);
         state = manager.getComponent<GameState>(pe);
         health = manager.getComponent<Health>(pe);
+        if(!exp || !state)
+          return;
         break;
       }
       
@@ -244,13 +261,10 @@ namespace game {
         }
       }
       
-      if(!exp || !state)
-        return;
-      
       //lvl up logic
       if(exp->cur >= exp->max && !state->isLvlUp) {
         exp->cur -= exp->max;
-        exp->max *= 1.2f;
+        exp->max = static_cast<uint32_t>(exp->max * 1.2f);
         exp->curLvl++;
         health->cur = health->max;
         
@@ -363,14 +377,19 @@ namespace game {
       auto& sprites = manager.view<Sprite>();
       auto& acts = manager.view<Active>();
       
-      for(auto ae : animators.getOwners()) {
+      auto validAnims = animators.getOwners() | std::views::filter([&](ecs::EntID ae) {
         auto* act = acts.get(ae);
-        if(act && !act->value) continue;
+        auto* spr = sprites.get(ae);
+        return ((!act || act->value) && (spr));
+      });
+      // for(auto ae : animators.getOwners()) {
+      for(auto ae : validAnims) {
+        // if(act && !act->value) continue;
         
         auto* anim = animators.get(ae);
         auto* spr = sprites.get(ae);
         
-        if(!spr) continue;
+        // if(!spr) continue;
         
         anim->timer += dT;
         
@@ -602,9 +621,6 @@ namespace game {
         glm::vec2 spawnPos = plPos + glm::vec2(cos(rad), sin(rad)) * m_spawnRadius;
         
         ecs::EntID e = createEnemy(manager, spawnPos);
-        
-        // auto* vel = manager.getComponent<Velocity>(e);
-        // vel->value = glm::normalize(plPos - spawnPos) * m_speed;
       }
     }
     
@@ -1068,8 +1084,7 @@ namespace game {
         
         if(!hp || !status) continue;
         
-        for(int i = static_cast<int>(status->dots.size()) - 1; i >= 0; --i) {
-          auto& dot = status->dots[i];
+        std::erase_if(status->dots, [&](DoTCharge& dot) {
           dot.lifetime -= dT;
           dot.curTickTimer -= dT;
           
@@ -1078,10 +1093,9 @@ namespace game {
             dot.curTickTimer = dot.tickRate;
           }
           
-          if(dot.lifetime <= 0.f) {
-            status->dots.erase(status->dots.begin() + i);
-          }
-        }
+          return dot.lifetime <= 0.f;
+        });
+        
       }
     }
   };

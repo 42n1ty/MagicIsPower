@@ -21,6 +21,7 @@ struct Task {
   
   std::coroutine_handle<promise_type> handle = nullptr;
   
+  Task() {} //???
   Task(std::coroutine_handle<promise_type> h) : handle(h) {}
   ~Task() {
     if(handle) {

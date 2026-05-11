@@ -231,6 +231,9 @@ namespace ecs {
   // MANAGER
   //==========================================
   
+  template <typename T>
+  concept Component = std::is_default_constructible_v<T> && std::is_move_assignable_v<T>;
+  
   class Manager {
     std::vector<std::unique_ptr<IComponentStor>> storsOwnership;
     std::vector<IComponentStor*> storsID;
@@ -275,7 +278,7 @@ namespace ecs {
     // COMPONENT MANAGEMENT
     //==========================================
     
-    template <typename T>
+    template <Component T>
     void registerComponent() {
       TypeID id = getComponentID<T>();
       
@@ -290,7 +293,7 @@ namespace ecs {
       storsOwnership.emplace_back(std::move(newStor));
     }
     
-    template <typename T>
+    template <Component T>
     T& addComponent(EntID e, T&& comp) {
       TypeID id = getComponentID<T>();
       
@@ -301,14 +304,14 @@ namespace ecs {
       return static_cast<SparseSet<T>*>(storsID[id])->add(e, std::move(comp));
     }
     
-    template <typename T>
+    template <Component T>
     void removeComponent(EntID e) {
       TypeID id = getComponentID<T>();
       signatures[e].set(id, false);
       storsID[id]->remove(e);
     }
     
-    template <typename T>
+    template <Component T>
     T* getComponent(EntID e) {
       TypeID id = getComponentID<T>();
       if(!signatures[e].test(id)) return nullptr;
