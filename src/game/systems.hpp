@@ -367,6 +367,8 @@ namespace game {
         float screenX = kin->pos.x - playerPos.x + halfW;
         float screenY = kin->pos.y - playerPos.y + halfH;
         
+        if(screenX < -100.f || screenX > w + 100.f || screenY < -100.f || screenY > h + 100.f) continue;
+        
         ImVec2 textSize = ImGui::CalcTextSize(item->name.c_str());
         ImVec2 textPos(screenX - textSize.x / 2.f, screenY - 20.f);
         
