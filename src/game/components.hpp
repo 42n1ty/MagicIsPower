@@ -172,7 +172,7 @@ namespace game {
     }
   }; //29
   struct PlayerLootFilter {
-    std::vector<LootFilterRool> rules;
+    std::vector<LootFilterRule> rules;
     
     PlayerLootFilter() {
       rules.push_back({

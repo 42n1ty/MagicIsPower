@@ -40,7 +40,7 @@ namespace game {
     AutoSalvage
   };
   
-  struct LootFilterRool {
+  struct LootFilterRule {
     bool enable = true;
     std::string name;
     
