@@ -25,7 +25,12 @@ namespace game {
       m_manager->registerComponent<PlayerTag>();
       m_manager->registerComponent<DirtyStatsTag>();
       m_manager->registerComponent<SkillTag>();
+      
       m_manager->registerComponent<InventoryItem>();
+      m_manager->registerComponent<PlayerLootFilter>();
+      m_manager->registerComponent<GroundItem>();
+      m_manager->registerComponent<Materials>();
+      
       m_manager->registerComponent<PlayerStats>();
       m_manager->registerComponent<PermanentStats>();
       m_manager->registerComponent<ActiveSkillGem>();
@@ -75,12 +80,13 @@ namespace game {
       m_manager->registerSystem<LifetimeSystem>();
       m_manager->registerSystem<StatCalcSystem>(m_skillDB.get());
       m_manager->registerSystem<DamageSystem>(m_frameArena.get());
+      m_manager->registerSystem<LootSystem>(rend, m_frameArena.get());
       m_manager->registerSystem<CombatSystem>(m_skillDB.get(), wnd);
       m_manager->registerSystem<VisualEffectsSystem>();
       m_manager->registerSystem<AnimSystem>();
-      m_manager->registerSystem<EnemySpawnerSystem>(rend);
+      m_manager->registerSystem<EnemySpawnerSystem>(rend, m_frameArena.get());
       m_manager->registerSystem<UISystem>(wnd);
-      m_manager->registerSystem<GamePlayUISystem>();
+      m_manager->registerSystem<GamePlayUISystem>(wnd);
       m_manager->registerSystem<RenderSystem>(rend);
       
       return true;
@@ -289,6 +295,8 @@ namespace game {
         .frameCnt = 4,
         .frameTime = 0.15f
       });
+      m_manager->addComponent(player, Materials{});
+      m_manager->addComponent(player, PlayerLootFilter{});
       
       
       auto auraGem = m_manager->createEntity();

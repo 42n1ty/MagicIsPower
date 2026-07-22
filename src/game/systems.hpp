@@ -236,13 +236,18 @@ namespace game {
   };
   
   class GamePlayUISystem : public ecs::ISystem {
+    GLFWwindow* m_wnd = nullptr;
   public:
+    
+    GamePlayUISystem(GLFWwindow* wnd) : m_wnd(wnd) {}
+    
     void update(ecs::Manager& manager, const float dT) override {
       ecs::EntID pe = ecs::NULL_ENT;
       Exp* exp = nullptr;
       GameState* state = nullptr;
       Health* health = nullptr;
       ActiveSkillGem* aura = nullptr;
+      uint32_t count = 0;
       
       for(auto e : manager.view<PlayerTag>().getOwners()) {
         pe = e;
@@ -259,6 +264,10 @@ namespace game {
         if(item && item->owner == pe && item->isEquipped) {
           aura = manager.getComponent<ActiveSkillGem>(ge);
         }
+      }
+      for(auto ie : manager.view<InventoryItem>().getOwners()) {
+        auto* item = manager.getComponent<InventoryItem>(ie);
+        if(item && item->owner == pe && item->isEquipped == false) count++;
       }
       
       //lvl up logic
@@ -280,6 +289,7 @@ namespace game {
       ImGui::Text("Aura lvl: %d", (int)aura->lvl);
       ImGui::Text("Aura curLvl dmg: %d", (int)aura->curLvlDmg);
       ImGui::Text("Aura final dmg: %d", (int)aura->finalDmg);
+      ImGui::Text("Items picked up: %d", (int)count);
       ImGui::End();
       
       //lvl up rendering
@@ -334,6 +344,121 @@ namespace game {
         
         ImGui::End();
       }
+      
+      // loot pick up
+      int w, h;
+      glfwGetWindowSize(m_wnd, &w, &h);
+      float halfW = w / 2.f;
+      float halfH = h / 2.f;
+      
+      glm::vec2 playerPos = manager.getComponent<Kinematics>(pe)->pos;
+      
+      ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+      ImVec2 mousePos = ImGui::GetMousePos();
+      bool clicked = ImGui::IsMouseClicked(0);
+      
+      std::vector<ecs::EntID> pickedUpItems;
+      
+      for(auto ie : manager.view<GroundItem>().getOwners()) {
+        auto* item = manager.getComponent<GroundItem>(ie);
+        auto* kin = manager.getComponent<Kinematics>(ie);
+        if(!ie || !kin) continue;
+        
+        float screenX = kin->pos.x - playerPos.x + halfW;
+        float screenY = kin->pos.y - playerPos.y + halfH;
+        
+        ImVec2 textSize = ImGui::CalcTextSize(item->name.c_str());
+        ImVec2 textPos(screenX - textSize.x / 2.f, screenY - 20.f);
+        
+        ImVec2 rectMin(textPos.x - 5.f, textPos.y - 2.f);
+        ImVec2 rectMax(textPos.x + textSize.x + 5.f, textPos.y + textSize.y + 2.f);
+        
+        bool hovered = mousePos.x >= rectMin.x && mousePos.x <= rectMax.x && mousePos.y >= rectMin.y && mousePos.y <= rectMax.y;
+        
+        ImColor bgClr = hovered ? ImColor(80, 80, 80, 200) : ImColor(0, 0, 0, 150);
+        drawList->AddRectFilled(rectMin, rectMax, bgClr, 3.f);
+        
+        ImColor textClr = (item->rarity == ItemRarity::Epic) ? ImColor(255, 150, 0) : ImColor(255, 255, 255);
+        drawList->AddText(textPos, textClr, item->name.c_str());
+        
+        if(hovered && clicked) {
+          pickedUpItems.emplace_back(ie);
+        }
+      }
+      
+      for(auto ie : pickedUpItems) {
+        manager.addComponent(ie, InventoryItem{.owner = pe, .isEquipped = false});
+        manager.removeComponent<GroundItem>(ie);
+        manager.removeComponent<Kinematics>(ie);
+        manager.removeComponent<Sprite>(ie);
+      }
+    }
+  };
+  
+  struct DeathEvent {
+    glm::vec2 pos;
+    uint32_t enemyIdHash;
+    DeathEvent* next;
+  };
+  class LootSystem : public ecs::ISystem {
+    mip::IRenderer* m_rend;
+    ChunkedMA* m_arena;
+    std::shared_ptr<mip::IMaterial> m_lootMat;
+    
+  public:
+    static inline DeathEvent* frameDeaths = nullptr;
+    
+    LootSystem(mip::IRenderer* rend, ChunkedMA* arena) : m_rend(rend), m_arena(arena) {
+      m_lootMat = m_rend->createMaterial("../../assets/shaders/shader.spv");
+      auto tex = m_rend->createTexture("../../assets/textures/whitepixel.png", false);
+      if(tex) m_lootMat->setTexture(0, tex);
+    }
+    
+    void update(ecs::Manager& manager, const float dT) override {
+      ecs::EntID pe = ecs::NULL_ENT;
+      PlayerLootFilter* filter = nullptr;
+      Materials* mats = nullptr;
+      
+      for(auto e : manager.view<PlayerTag>().getOwners()) {
+        pe = e;
+        filter = manager.getComponent<PlayerLootFilter>(e);
+        mats = manager.getComponent<Materials>(e);
+        break;
+      }
+      
+      DeathEvent* de = frameDeaths;
+      while(de != nullptr) {
+        
+        bool isGemDrop = (rand() % 100) < 50;
+        
+        ItemRarity rolledRarity = isGemDrop ?  ItemRarity::Epic : ItemRarity::Junk;
+        ItemCategory rolledCategory = isGemDrop ?  ItemCategory::SkillGem : ItemCategory::Weapon;
+        std::string rolledID = isGemDrop ? "gem" : "rusty_sword";
+        
+        FilterAction action = FilterAction::Show;
+        if(filter) {
+          action = filter->evaluate(rolledRarity, rolledCategory);
+        }
+        
+        if(action == FilterAction::AutoSalvage) {
+          if(mats) mats->scrapMetal += 1;
+          Logger::debug("Junk dropped: {}", mats->scrapMetal);
+        }
+        else if(action == FilterAction::Show) {
+          ecs::EntID itemE = manager.createEntity();
+          manager.addComponent(itemE, Active{});
+          manager.addComponent(itemE, GroundItem{.name = rolledID, .rarity = rolledRarity});
+          manager.addComponent(itemE, Kinematics{.z = 5, .pos = de->pos, .scale = {30.f, 30.f}});
+          glm::vec4 color = (rolledRarity == ItemRarity::Epic) ?  glm::vec4(1.f, 0.5f, 0.f, 1.f) : glm::vec4(0.8f, 0.8f, 0.8f, 1.f);
+          manager.addComponent(itemE, ColorTint{.baseColor = color});
+          manager.addComponent(itemE, Sprite{.mesh = m_rend->getGlobalQuad(), .material = m_lootMat});
+          Logger::debug("Gem dropped: {}", rolledID);
+        }
+        
+        de = de->next;
+      }
+      
+      frameDeaths = nullptr;
     }
   };
   
@@ -529,6 +654,7 @@ namespace game {
     float m_waveTimer = 0.f;
     float m_spawnRadius = 800.f;
     std::shared_ptr<mip::IMaterial> m_enemyMat;
+    ChunkedMA* m_arena;
     
     float m_speed; //temp need enemyConfigs later
     
@@ -536,10 +662,12 @@ namespace game {
     
     inline static uint32_t diedCount = 0;
     
-    EnemySpawnerSystem(mip::IRenderer* rend) : m_rend(rend) {
+    EnemySpawnerSystem(mip::IRenderer* rend, ChunkedMA* arena) : m_rend(rend) {
       m_enemyMat = m_rend->createMaterial("../../assets/shaders/shader.spv");
       auto tex = m_rend->createTexture("../../assets/textures/mob1.png", false);
       m_enemyMat->setTexture(0, tex);
+      
+      m_arena = arena;
     }
     
     ecs::EntID createEnemy(ecs::Manager& manager, glm::vec2 spawnPos) {
@@ -673,6 +801,14 @@ namespace game {
           pexp->cur += 1;
           Logger::debug("Enemy died! #{}", diedCount++);
           m_pool.push_back(e);
+          
+          auto* kin = manager.getComponent<Kinematics>(e);
+          if(kin) {
+            auto* de = m_arena->alloc<DeathEvent>();
+            de->pos = kin->pos;
+            de->next = LootSystem::frameDeaths;
+            LootSystem::frameDeaths = de;
+          }
           // exp
         }
       }

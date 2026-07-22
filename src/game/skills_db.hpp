@@ -95,7 +95,7 @@ namespace game {
           
           manager.addComponent(e, Active{});
           manager.addComponent(e, WeaponTag{});
-          manager.addComponent(e, Kinematics{ .z = 8, .pos = pos, .scale = {gem.finalRadius * 2, gem.finalRadius * 2}, .vel = vel });
+          manager.addComponent(e, Kinematics{ .z = 1, .pos = pos, .scale = {gem.finalRadius * 2, gem.finalRadius * 2}, .vel = vel });
           manager.addComponent(e, CircleCollider{.radius = gem.finalRadius});
           manager.addComponent(e, DamageDealer{.amount = gem.finalDmg, .dmgType = SkillTag::Fire});
           manager.addComponent(e, PulseCooldown{.curTimer = gem.finalCd, .maxTimer = gem.finalCd});

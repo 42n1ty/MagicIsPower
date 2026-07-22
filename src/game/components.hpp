@@ -6,6 +6,7 @@
 #include "../graphics/i_texture.hpp"
 #include "../graphics/i_mesh.hpp"
 #include "../graphics/i_material.hpp"
+#include "item_types.hpp"
 
 
 namespace game {
@@ -170,6 +171,49 @@ namespace game {
       return false;
     }
   }; //29
+  struct PlayerLootFilter {
+    std::vector<LootFilterRool> rules;
+    
+    PlayerLootFilter() {
+      rules.push_back({
+        true,
+        "Always show Gems & Relics",
+        static_cast<uint32_t>(ItemRarity::Relic),
+        static_cast<uint32_t>(ItemCategory::SkillGem),
+        FilterAction::Show
+      });
+      rules.push_back({
+        true,
+        "Salvage Junk gear",
+        static_cast<uint32_t>(ItemRarity::Junk),
+        static_cast<uint32_t>(ItemCategory::Armor) | static_cast<uint32_t>(ItemCategory::Weapon),
+        FilterAction::AutoSalvage
+      });
+      
+      rules.push_back({true, "Default", 0xFFFFFFFF, 0xFFFFFFFF, FilterAction::Show});
+    }
+    
+    FilterAction evaluate(ItemRarity rarity, ItemCategory category) {
+      for(const auto& rule : rules) {
+        if(!rule.enable) continue;
+        bool matchRarity = (static_cast<uint32_t>(rarity) & rule.rarityMask) != 0;
+        bool matchCategory = (static_cast<uint32_t>(category) & rule.categoryMask) != 0;
+        
+        if(matchCategory && matchRarity) {
+          return rule.action;
+        }
+      }
+      
+      return FilterAction::Show;
+    }
+  };
+  struct GroundItem {
+    std::string name;
+    ItemRarity rarity;
+  };
+  struct Materials {
+    uint32_t scrapMetal = 0;
+  };
   
   
   struct UITag {};
