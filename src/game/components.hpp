@@ -86,14 +86,23 @@ namespace game {
   struct EnemyTag {};
   struct WeaponTag {};
   struct Active { bool value = true; };
+  enum DmgType : uint8_t {
+    Physical = 0, Fire, Air, Water, Earth, Cold, Lightning, Light, Darkness, Sonic, Mental, Astral, Spatial, Fate, Acid, Poison, Pure,
+    Count
+  };
+  struct DmgPart {
+    DmgType type;
+    float amount;
+    float pen;
+  };
+  struct DamageDealer {
+    DmgPart parts[7];
+    uint8_t count = 0;
+  }; //64
+  struct Resistances {
+    float res[DmgType::Count] = {0.f};
+  };
   enum SkillTag : uint32_t {
-    None = 0,
-    Fire       = 1 << 0,
-    Water      = 1 << 1,
-    Earth      = 1 << 2,
-    Air        = 1 << 3,
-    Cold       = 1 << 4,
-    Lightning  = 1 << 5,
     Aura       = 1 << 6,
     AoE        = 1 << 7,
     Projectile = 1 << 8,
@@ -104,17 +113,19 @@ namespace game {
     bool isEquipped = false;
   };
   struct PlayerStats {
-    //TODO: fixed percentage in uint16_t instead of float to minimize size ???
-    float incFireDmg = 0.f;
-    float incColdDmg = 0.f;
-    float incAoERadius = 0.f;
+    float incDmg[DmgType::Count] = {0.f};
+    float flatAddedDmg[DmgType::Count] = {0.f};
+    float penetration[DmgType::Count] = {0.f};
+    
+    float incAoERadius = 1.f;
+    float incAoEDmg = 0.f;
     float cdReduction = 0.f;
     uint32_t extraProj = 0;
-  }; //20
+  }; //
   struct PermanentStats {
-    float incFireDmg = 0.f;
-    float incColdDmg = 0.f;
-    float incAoERadius = 0.f;
+    float incDmg[DmgType::Count] = {0.f};
+    
+    float incAoERadius = 1.f;
     float cdReduction = 0.f;
     uint32_t extraProj = 0;
   }; //
@@ -123,17 +134,32 @@ namespace game {
     uint32_t tagsMask;
     int lvl = 1;
     
-    float finalDmg = 0.f;
+    DmgPart finalDmgParts[7];
+    uint8_t dmgCnt = 0;
+    
     float finalCd = 0.f;
     float finalRadius = 0.f;
     uint32_t finalProj = 0;
+    float dmgMultiplier = 1.f;
     
     float curCdTimer = 0.f;
-    float dmgMultiplier = 1.f;
     float curLvlDmg = 0.f; //actually unused except for GamePlayUISystem
     
     ecs::EntID spawnedEnt = ecs::NULL_ENT;
-  }; //44
+    
+    void addFinalDmg(DmgType t, float amt, float p = 0.f) {
+      for(int i = 0; i < dmgCnt; ++i) {
+        if(finalDmgParts[i].type == t) {
+          finalDmgParts[i].amount += amt;
+          finalDmgParts[i].pen += p;
+          return;
+        }
+      }
+      if(dmgCnt < 7) {
+        finalDmgParts[dmgCnt++] = {t, amt, p};
+      }
+    }
+  }; //
   struct SupGem {
     uint32_t supIdHash;
     int lvl = 1;
@@ -252,20 +278,6 @@ namespace game {
     ecs::EntID target;
     glm::vec2 offset{0.f, 0.f};
   }; //12
-  
-  struct DamageDealer {
-    float amount;
-    SkillTag dmgType;
-    float pen = 0.f;
-  }; //12
-  struct Resistances {
-    float fire = 0.f;
-    float water = 0.f;
-    float earth = 0.f;
-    float air = 0.f;
-    float cold = 0.f;
-    float lightning = 0.f;
-  };
   
   struct PulseCooldown {
     float curTimer = 1.f;

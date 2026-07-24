@@ -19,7 +19,9 @@ namespace game {
     uint32_t tagsMask;
     CastType castType;
     
-    float baseDmg;
+    DmgPart baseDmgParts[7];
+    uint8_t baseDmgCnt = 0;
+    
     float baseRadius;
     float baseCd;
     uint8_t baseProj;
@@ -60,9 +62,10 @@ namespace game {
       //1. Active skills
       activeSkills[Hash("fireball")] = {
         .name = "Fireball",
-        .tagsMask = SkillTag::Fire | SkillTag::Projectile,
+        .tagsMask = SkillTag::Projectile,
         .castType = CastType::Continuous,
-        .baseDmg = 10.f,
+        .baseDmgParts = {{.type = DmgType::Fire, .amount = 10.f, .pen = 0}},
+        .baseDmgCnt = 1,
         .baseRadius = 15.f,
         .baseCd = 0.8f,
         .baseProj = 1,
@@ -74,10 +77,13 @@ namespace game {
           manager.addComponent(e, WeaponTag{});
           manager.addComponent(e, Kinematics{ .z = 15, .pos = pos, .scale = {gem.finalRadius * 2, gem.finalRadius * 2}, .vel = vel });
           manager.addComponent(e, CircleCollider{.radius = gem.finalRadius});
-          manager.addComponent(e, DamageDealer{.amount = gem.finalDmg, .dmgType = SkillTag::Fire});
+          auto& dd = manager.addComponent(e, DamageDealer{});
+          dd.count = gem.dmgCnt;
+          for(int i = 0; i < gem.dmgCnt; ++i) dd.parts[i] = gem.finalDmgParts[i];
           manager.addComponent(e, Lifetime{.curTimer = timer, .maxTimer = timer});
           manager.addComponent(e, Pierce{.count = 2});
           manager.addComponent(e, Sprite{.mesh = m_rend->getGlobalQuad(), .material = getMaterial("../../assets/textures/fb.png")});
+          // manager.addComponent(e, ColorTint{.baseColor = {1.f, 0.2f, 0.f, 1.f}});
           
           return e;
         }
@@ -85,9 +91,10 @@ namespace game {
       
       activeSkills[Hash("aura")] = {
         .name = "Nuclear",
-        .tagsMask = SkillTag::Aura | SkillTag::AoE | SkillTag::Fire,
+        .tagsMask = SkillTag::Aura | SkillTag::AoE,
         .castType = CastType::Persistent,
-        .baseDmg = 5.f,
+        .baseDmgParts = {{.type = DmgType::Fire, .amount = 5.f, .pen = 0}},
+        .baseDmgCnt = 1,
         .baseRadius = 150.f,
         .baseCd = 0.5f,
         .baseProj = 0,
@@ -98,7 +105,9 @@ namespace game {
           manager.addComponent(e, WeaponTag{});
           manager.addComponent(e, Kinematics{ .z = 1, .pos = pos, .scale = {gem.finalRadius * 2, gem.finalRadius * 2}, .vel = vel });
           manager.addComponent(e, CircleCollider{.radius = gem.finalRadius});
-          manager.addComponent(e, DamageDealer{.amount = gem.finalDmg, .dmgType = SkillTag::Fire});
+          auto& dd = manager.addComponent(e, DamageDealer{});
+          dd.count = gem.dmgCnt;
+          for(int i = 0; i < gem.dmgCnt; ++i) dd.parts[i] = gem.finalDmgParts[i];
           manager.addComponent(e, PulseCooldown{.curTimer = gem.finalCd, .maxTimer = gem.finalCd});
           manager.addComponent(e, Sprite{.mesh = m_rend->getGlobalQuad(), .material = getMaterial("../../assets/textures/222.png")});
           
@@ -110,8 +119,7 @@ namespace game {
       supSkills[Hash("added_fire")] = {
         "Added fire damage",
         [](ActiveSkillGem& targetGem, int supLvl) {
-          targetGem.finalDmg += 10.f * supLvl;
-          targetGem.tagsMask |= SkillTag::Fire;
+          targetGem.finalDmgParts[DmgType::Fire].amount += 10.f * supLvl;
         }
       };
     }

@@ -288,7 +288,6 @@ namespace game {
       ImGui::Text("EXP: %d / %d", (int)exp->cur, (int)exp->max);
       ImGui::Text("Aura lvl: %d", (int)aura->lvl);
       ImGui::Text("Aura curLvl dmg: %d", (int)aura->curLvlDmg);
-      ImGui::Text("Aura final dmg: %d", (int)aura->finalDmg);
       ImGui::Text("Items picked up: %d", (int)count);
       ImGui::End();
       
@@ -932,25 +931,26 @@ namespace game {
                   continue;
                 }
                 
-                float finalDmg = dmg->amount;
-                // if(auto* res = manager.getComponent<Resistances>(ee)) {
-                //   float targetRes = 0.f;
-                //   if(dmg->dmgType == SkillTag::Fire) targetRes = res->fire;
-                //   else if(dmg->dmgType == SkillTag::Water) targetRes = res->water;
-                //   else if(dmg->dmgType == SkillTag::Air) targetRes = res->air;
-                //   else if(dmg->dmgType == SkillTag::Earth) targetRes = res->earth;
-                //   else if(dmg->dmgType == SkillTag::Cold) targetRes = res->cold;
-                //   else if(dmg->dmgType == SkillTag::Lightning) targetRes = res->lightning;
-                  
-                //   targetRes -= dmg->pen;
-                //   targetRes = std::max(targetRes, 2.f);
-                  
-                //   finalDmg *= (1.f - targetRes);
-                // }
-                
                 float dist = glm::distance(wk->pos, ek->pos);
                 if(dist < (wc->radius + ec->radius)) {
-                  ehp->cur -= finalDmg; // once damage
+                  
+                  auto* res = manager.getComponent<Resistances>(ee);
+                  float totalHitDmg = 0.f;
+                  
+                  for(int d = 0; d < dmg->count; ++d) {
+                    const auto& part = dmg->parts[d];
+                    float dmg = part.amount;
+                    
+                    if(res) {
+                      float targetRes = res->res[part.type] - part.pen;
+                      targetRes = std::clamp(targetRes, -2.f, 0.9f);
+                      dmg *= (1.f - targetRes);
+                    }
+                    
+                    totalHitDmg += dmg;
+                  }
+                  
+                  ehp->cur -= totalHitDmg; // once damage
                   // flash effect after gaining damage
                   float time = 0.2f;
                   manager.addComponent(ee, FlashEffect{ .maxTime = time, .curTime = time, .color = {1.f, 0.f, 0.f, 1.f} });
@@ -971,7 +971,6 @@ namespace game {
                   if(auto* pierce = manager.getComponent<Pierce>(we)) {
                     pierce->count--;
                     if(pierce->count <= 0) {
-                      // wact->value = false;
                       m_toDestroy.emplace_back(we);
                       return;
                     }
@@ -1046,20 +1045,12 @@ namespace game {
         if(manager.getComponent<DirtyStatsTag>(pe)) {
           auto* pStats = manager.getComponent<PlayerStats>(pe);
           auto* prStats = manager.getComponent<PermanentStats>(pe);
-          if(!pStats) continue;
+          if(!pStats || !prStats) continue;
           
-          pStats->incFireDmg = 0.f;
-          pStats->incColdDmg = 0.f;
-          pStats->incAoERadius = 0.f;
-          pStats->cdReduction = 0.f;
-          pStats->extraProj = 0;
-          
-          //TODO: gear cycle
-          
-          pStats->incFireDmg = prStats->incFireDmg;
-          pStats->incColdDmg = prStats->incColdDmg;
+          for(int d = 0; d < DmgType::Count; ++d) {
+            pStats->incDmg[d] = prStats->incDmg[d];
+          }
           pStats->incAoERadius = prStats->incAoERadius;
-          pStats->cdReduction = prStats->cdReduction;
           pStats->extraProj = prStats->extraProj;
           
           manager.removeComponent<DirtyStatsTag>(pe);
@@ -1084,15 +1075,17 @@ namespace game {
         const auto& baseConf = m_skillDB->activeSkills[gem->skillIdHash];
         
         gem->tagsMask = baseConf.tagsMask;
-        gem->finalDmg = baseConf.baseDmg * (1.f + (gem->lvl * 0.5f));
-        gem->curLvlDmg = gem->finalDmg;
         gem->finalCd = baseConf.baseCd;
         gem->finalRadius = baseConf.baseRadius;
         gem->finalProj = baseConf.baseProj;
         gem->dmgMultiplier = 1.f;
         
-        float totalIncDmg = 0.f;
-        float totalIncRadius = 0.f;
+        gem->dmgCnt = baseConf.baseDmgCnt;
+        for(int p = 0; p < gem->dmgCnt; ++p) {
+          gem->finalDmgParts[p].type = baseConf.baseDmgParts[p].type;
+          gem->finalDmgParts[p].amount = baseConf.baseDmgParts[p].amount * (1.f + (gem->lvl * 0.1f));
+          gem->finalDmgParts[p].pen = baseConf.baseDmgParts[p].pen;
+        }
         
         //TODO: count passives
         
@@ -1106,23 +1099,29 @@ namespace game {
           }
         }
         
-        if(gem->tagsMask & SkillTag::Fire) {
-          totalIncDmg += pStats->incFireDmg;
-        }
-        if(gem->tagsMask & SkillTag::Cold) {
-          totalIncDmg += pStats->incColdDmg;
-        }
-        if(gem->tagsMask & SkillTag::AoE) {
-          totalIncRadius += pStats->incAoERadius;
-        }
-        //TODO: other mods
         
-        gem->finalDmg = gem->finalDmg * (1.f + totalIncDmg) * gem->dmgMultiplier;
-        gem->finalRadius = gem->finalRadius * (1.f + totalIncRadius);
+        for(int p = 0; p < gem->dmgCnt; ++p) {
+          auto& part = gem->finalDmgParts[p];
+          float totalIncDmg = 0.f;
+          
+          totalIncDmg += pStats->incDmg[part.type];
+          part.pen += pStats->penetration[part.type];
+          
+          if(gem->tagsMask & SkillTag::AoE)
+            totalIncDmg += pStats->incAoEDmg;
+          //TODO: other mods
+          
+          part.amount = (part.amount + pStats->flatAddedDmg[part.type]) * (1.f + totalIncDmg) * gem->dmgMultiplier;
+        }
+        
+        float incRadius = (gem->tagsMask & SkillTag::AoE) ? pStats->incAoERadius : 1.f;
+        gem->finalRadius = gem->finalRadius * (1.f * incRadius);
         
         if (gem->spawnedEnt != ecs::NULL_ENT) {
           if (auto* dmg = manager.getComponent<DamageDealer>(gem->spawnedEnt)) {
-            dmg->amount = gem->finalDmg;
+            dmg->count = gem->dmgCnt;
+            for(int p = 0; p < gem->dmgCnt; ++p)
+              dmg->parts[p] = gem->finalDmgParts[p];
           }
           if (auto* col = manager.getComponent<CircleCollider>(gem->spawnedEnt)) {
             col->radius = gem->finalRadius;
