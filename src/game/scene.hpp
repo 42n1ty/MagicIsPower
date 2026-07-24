@@ -299,16 +299,27 @@ namespace game {
       m_manager->addComponent(player, PlayerLootFilter{});
       
       
-      auto auraGem = m_manager->createEntity();
-      m_manager->addComponent(auraGem, ActiveSkillGem{
-        .skillIdHash = Hash("aura"),
+      // auto auraGem = m_manager->createEntity();
+      // m_manager->addComponent(auraGem, ActiveSkillGem{
+      //   .skillIdHash = Hash("aura"),
+      //   .lvl = 1
+      // });
+      // m_manager->addComponent(auraGem, InventoryItem{
+      //   .owner = player,
+      //   .isEquipped = true
+      // });
+      // m_manager->addComponent(auraGem, DirtyStatsTag{});
+      
+      auto fbGem = m_manager->createEntity();
+      m_manager->addComponent(fbGem, ActiveSkillGem{
+        .skillIdHash = Hash("fireball"),
         .lvl = 1
       });
-      m_manager->addComponent(auraGem, InventoryItem{
+      m_manager->addComponent(fbGem, InventoryItem{
         .owner = player,
         .isEquipped = true
       });
-      m_manager->addComponent(auraGem, DirtyStatsTag{});
+      m_manager->addComponent(fbGem, DirtyStatsTag{});
       
       return true;
     }

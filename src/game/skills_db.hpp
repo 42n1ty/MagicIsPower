@@ -76,6 +76,7 @@ namespace game {
           manager.addComponent(e, CircleCollider{.radius = gem.finalRadius});
           manager.addComponent(e, DamageDealer{.amount = gem.finalDmg, .dmgType = SkillTag::Fire});
           manager.addComponent(e, Lifetime{.curTimer = timer, .maxTimer = timer});
+          manager.addComponent(e, Pierce{.count = 2});
           manager.addComponent(e, Sprite{.mesh = m_rend->getGlobalQuad(), .material = getMaterial("../../assets/textures/fb.png")});
           
           return e;

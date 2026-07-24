@@ -1161,7 +1161,17 @@ namespace game {
       bool isClicking = glfwGetMouseButton(m_wnd, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
       double x, y;
       glfwGetCursorPos(m_wnd, &x, &y);
-      glm::vec2 targetDir{static_cast<float>(x), static_cast<float>(y)};
+      int w, h;
+      glfwGetWindowSize(m_wnd, &w, &h);
+      glm::vec2 playerPos{w / 2.f, h / 2.f};
+      glm::vec2 mousePos{static_cast<float>(x), static_cast<float>(y)};
+      glm::vec2 targetDir = mousePos - playerPos;
+      if(glm::length(targetDir) > 0.1f) {
+        targetDir = glm::normalize(targetDir);
+      }
+      else {
+        targetDir = {1.f, 0.f};
+      }
       
       for(auto ge :  manager.view<ActiveSkillGem>().getOwners()) {
         auto* gem = manager.getComponent<ActiveSkillGem>(ge);
@@ -1187,7 +1197,7 @@ namespace game {
           
           if(isClicking && gem->curCdTimer <= 0.f) {
             for(int i = 0; i < gem->finalProj; ++i) {
-              glm::vec2 vel = glm::normalize(targetDir) * 300.f;
+              glm::vec2 vel = targetDir * 300.f;
               config.buildPrefub(manager, pos, vel, *gem);
             }
             gem->curCdTimer = gem->finalCd;
