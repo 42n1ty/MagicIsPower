@@ -62,7 +62,7 @@ namespace game {
         .name = "Fireball",
         .tagsMask = SkillTag::Fire | SkillTag::Projectile,
         .castType = CastType::Continuous,
-        .baseDmg = 25.f,
+        .baseDmg = 10.f,
         .baseRadius = 15.f,
         .baseCd = 0.8f,
         .baseProj = 1,
