@@ -62,6 +62,7 @@ namespace ecs {
   struct ISystem {
     virtual ~ISystem() = default;
     virtual void update(Manager& ecs, const float dt) = 0;
+    virtual bool isGameplaySystem() const {return true;}
   };
   
   
@@ -313,6 +314,7 @@ namespace ecs {
     
     template <Component T>
     T* getComponent(EntID e) {
+      if(e == NULL_ENT) return nullptr;
       TypeID id = getComponentID<T>();
       if(!signatures[e].test(id)) return nullptr;
       
@@ -333,9 +335,17 @@ namespace ecs {
     // loader API - std::expected<T, std::string> load(const std::string&)
     template <typename T, typename L>
     void registerAsset(L&& l) {
-      auto pool = std::make_unique<AssetPool<T>>();
-      AssetPool<T>* rawPool = pool.get();
-      assets[std::type_index(typeid(T))] = std::move(pool);
+      auto it = assets.find(std::type_index(typeid(T)));
+      AssetPool<T>* rawPool;
+      
+      if(it == assets.end()) {
+        auto pool = std::make_unique<AssetPool<T>>();
+        rawPool = pool.get();
+        assets[std::type_index(typeid(T))] = std::move(pool);
+      }
+      else {
+        rawPool = static_cast<AssetPool<T>*>(it->second.get());
+      }
       
       assetLoaders[std::type_index(typeid(T))] = [rawPool, loader = std::forward<L>(l)](const std::string& path) mutable -> rawHandle {
         if(auto existing = rawPool->find(path)) {
@@ -368,8 +378,22 @@ namespace ecs {
       return static_cast<AssetPool<T>*>(it->second.get())->get(h);
     }
     
+    template <typename T>
+    Handle<T> insertAsset(std::string_view key, T&& asset) {
+      auto it = assets.find(std::type_index(typeid(T)));
+      assert(it != assets.end() && "Asset type not registered! Call registerAsset first");
+      
+      auto* pool = static_cast<AssetPool<T>*>(it->second.get());
+      if(auto existing = pool->find(key)) {
+        return Handle<T>{existing->index, existing->gen};
+      }
+      
+      rawHandle raw = pool->insert(key, std::move(asset));
+      return Handle<T>{raw.index, raw.gen};
+    }
+    
     //==========================================
-    // ASSET MANAGEMENT
+    // 
     //==========================================
     
     template <typename S, typename... Args>
@@ -383,9 +407,10 @@ namespace ecs {
       return *ptr;
     }
     
-    void update(float dt) {
+    void update(float dt, float timeScale = 1.f) {
       for(auto& sys : systems) {
-        sys->update(*this, dt);
+        float finalDT = sys->isGameplaySystem() ? dt * timeScale : dt;
+        sys->update(*this, finalDT);
       }
     }
   };

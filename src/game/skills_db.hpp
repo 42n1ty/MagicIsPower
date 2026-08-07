@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <functional>
 
-#include "components.hpp"
+#include "data.hpp"
 #include "../graphics/i_renderer.hpp"
 
 
@@ -37,18 +37,21 @@ namespace game {
   class SkillDB {
     
     mip::IRenderer* m_rend{nullptr};
-    std::unordered_map<std::string, std::shared_ptr<mip::IMaterial>> m_mats;
+    ecs::Handle<std::shared_ptr<mip::IMesh>> m_globalQuad;
+    std::unordered_map<std::string, ecs::Handle<std::shared_ptr<mip::IMaterial>>> m_mats;
     
-    std::shared_ptr<mip::IMaterial> getMaterial(const std::string& path) {
+    ecs::Handle<std::shared_ptr<mip::IMaterial>> getMaterial(const std::string& path, ecs::Manager& manager, const std::string& key) {
       if(m_mats.count(path) > 0) return m_mats[path];
       
       auto mat = m_rend->createMaterial("../../assets/shaders/shader.spv");
-      if(auto tex = m_rend->createTexture(path, false)) {
-        mat->setTexture(0, tex);
+      auto tex = manager.loadAsset<std::shared_ptr<mip::ITexture>>(path);
+      if(auto t = manager.getAsset(tex)) {
+        mat->setTexture(0, *t);
       }
-      m_mats[path] = mat;
+      auto finalMat = manager.insertAsset("mat." + key, std::move(mat));
+      m_mats[path] = finalMat;
       
-      return mat;
+      return finalMat;
     }
     
   public:
@@ -56,8 +59,8 @@ namespace game {
     std::unordered_map<uint32_t, SkillConf> activeSkills;
     std::unordered_map<uint32_t, SupConf> supSkills;
     
-    SkillDB(mip::IRenderer* rend) 
-      : m_rend(rend) {
+    SkillDB(mip::IRenderer* rend, ecs::Handle<std::shared_ptr<mip::IMesh>> globalQuad) 
+      : m_rend(rend), m_globalQuad(globalQuad) {
       
       //1. Active skills
       activeSkills[Hash("fireball")] = {
@@ -82,7 +85,7 @@ namespace game {
           for(int i = 0; i < gem.dmgCnt; ++i) dd.parts[i] = gem.finalDmgParts[i];
           manager.addComponent(e, Lifetime{.curTimer = timer, .maxTimer = timer});
           manager.addComponent(e, Pierce{.count = 2});
-          manager.addComponent(e, Sprite{.mesh = m_rend->getGlobalQuad(), .material = getMaterial("../../assets/textures/fb.png")});
+          manager.addComponent(e, Sprite{.mesh = m_globalQuad, .material = getMaterial("../../assets/textures/fb.png", manager, "fireball")});
           // manager.addComponent(e, ColorTint{.baseColor = {1.f, 0.2f, 0.f, 1.f}});
           
           return e;
@@ -109,7 +112,7 @@ namespace game {
           dd.count = gem.dmgCnt;
           for(int i = 0; i < gem.dmgCnt; ++i) dd.parts[i] = gem.finalDmgParts[i];
           manager.addComponent(e, PulseCooldown{.curTimer = gem.finalCd, .maxTimer = gem.finalCd});
-          manager.addComponent(e, Sprite{.mesh = m_rend->getGlobalQuad(), .material = getMaterial("../../assets/textures/222.png")});
+          manager.addComponent(e, Sprite{.mesh = m_globalQuad, .material = getMaterial("../../assets/textures/222.png", manager, "garlic")});
           
           return e;
         }

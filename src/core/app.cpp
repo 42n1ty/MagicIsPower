@@ -34,10 +34,10 @@ namespace mip {
     if(!m_scene->init(m_window.get(), m_renderer.get())) return false;
     
     if(
-        //  !m_scene->createLevel(m_window->m_width, m_window->m_height, m_renderer.get(), "../../assets/textures/map.png")
-         !m_scene->createTileLevel(m_renderer.get(), "../../assets/textures/1.png")
-      || !m_scene->createPlayer(m_window->m_width / 2, m_window->m_height / 2, m_renderer.get(), "../../assets/textures/player1anim.png")
-      // || !m_scene->createMobs(m_window->m_width / 3, m_window->m_height / 3, m_renderer.get(), "../../assets/textures/mob1.png")
+        //  !m_scene->createLevel(m_window->m_width, m_window->m_height, "../../assets/textures/map.png")
+         !m_scene->createTileLevel("../../assets/textures/1.png")
+      || !m_scene->createPlayer(m_window->m_width / 2, m_window->m_height / 2, "../../assets/textures/player1anim.png")
+      // || !m_scene->createMobs(m_window->m_width / 3, m_window->m_height / 3, "../../assets/textures/mob1.png")
       
     ) return false;   
     // scene==================================================
@@ -74,7 +74,7 @@ namespace mip {
       
       // if(!m_renderer->beginFrame(camData)) break;
       
-      if(!m_scene->update(deltaTime, m_renderer.get(), m_window->m_width, m_window->m_height)) break;
+      if(!m_scene->update(deltaTime, m_window->m_width, m_window->m_height)) break;
       
       // if(!m_renderer->endFrame()) break;
       

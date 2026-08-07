@@ -21,4 +21,16 @@ namespace game {
     }
   };
   
+  struct MeshLoader {
+    std::expected<std::shared_ptr<mip::IMesh>, std::string> load(const std::string&) {
+      return std::unexpected("Meshes use insertAsset, not loadAsset");
+    }
+  };
+  
+  struct MaterialLoader {
+    std::expected<std::shared_ptr<mip::IMaterial>, std::string> load(const std::string&) {
+      return std::unexpected("Materials use insertAsset, not loadAsset");
+    }
+  };
+  
 }; //game

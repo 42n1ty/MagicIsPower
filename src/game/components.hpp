@@ -11,10 +11,6 @@
 
 namespace game {
   
-  constexpr uint32_t Hash(const char* str, uint32_t hash = 2166136261u) {
-    return *str ? Hash(str + 1, (hash ^ static_cast<uint32_t>(*str)) * 16777619u) : hash;
-  }
-  
   struct Kinematics {
     uint8_t z = 0; //1
     glm::vec2 pos{0.f, 0.f}; //4+4
@@ -24,12 +20,36 @@ namespace game {
     float speed; //4
   }; //33
   
+  struct Transform {
+    glm::vec2 pos{0.f, 0.f}; //8
+    uint16_t z = 0; //2
+    uint16_t flags = 0; //2
+  };
+  inline bool isActive(const Transform& t) { return (t.flags & 1) != 0; }
+  inline void setActive(Transform& t, bool v) {
+    if(v) t.flags |= 1;
+    else t.flags &= ~1;
+  }
+  struct Velocity {
+    glm::vec2 vel{0.f, 0.f};
+  };
+  struct Renderable {
+    glm::vec2 scale{10.f, 10.f};
+    float rot = 0.f;
+  };
+  struct MoveSpeed {
+    float speed = 0.f;
+  };
+  
   struct Sprite {
-    // ecs::Handle<std::shared_ptr<mip::ITexture>> texHandle;
-    std::shared_ptr<mip::IMesh> mesh; //16
-    std::shared_ptr<mip::IMaterial> material; //16
+    // std::shared_ptr<mip::IMesh> mesh; //16
+    // std::shared_ptr<mip::IMaterial> material; //16
+    
+    ecs::Handle<std::shared_ptr<mip::IMesh>> mesh; //8
+    ecs::Handle<std::shared_ptr<mip::IMaterial>> material; //8
+    
     glm::vec4 uvRect{0.f, 0.f, 1.f, 1.f}; //4x4
-  }; //48
+  }; //24
   
   struct ColorTint {
     glm::vec4 baseColor{1.f, 1.f, 1.f, 1.f}; //4x4
@@ -186,10 +206,11 @@ namespace game {
     }
     bool remove(ecs::EntID sup) {
       if(cur > 0) {
-        for(auto s : gems) {
-          if(s == sup) {
-            std::swap(s, gems[cur]);
-            gems[cur] = ecs::NULL_ENT;
+        for(size_t i = 0; i < cur; ++i) {
+          if(gems[i] == sup) {
+            std::swap(gems[i], gems[cur - 1]);
+            gems[cur - 1] = ecs::NULL_ENT;
+            --cur;
             return true;
           }
         }
@@ -234,7 +255,7 @@ namespace game {
     }
   };
   struct GroundItem {
-    std::string name;
+    uint32_t nameHash;
     ItemRarity rarity;
   };
   struct Materials {
@@ -308,5 +329,20 @@ namespace game {
   
   struct Pierce {
     int count = 1;
+    ecs::EntID hitTargets[16] = {ecs::NULL_ENT};
+    uint8_t hitCnt = 0;
+    
+    bool hasHit(ecs::EntID target) const {
+      for(uint8_t i = 0; i < hitCnt; ++i) {
+        if(hitTargets[i] == target) return true;
+      }
+      return false;
+    }
+    
+    void addHit(ecs::EntID target) {
+      if(hitCnt < 16) {
+        hitTargets[hitCnt++] = target;
+      }
+    }
   };
 }; //game

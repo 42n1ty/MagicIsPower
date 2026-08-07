@@ -6,6 +6,7 @@
 #include "../common/ecs_core.hpp"
 #include <../common/chunked_ma.hpp>
 #include "skills_db.hpp"
+#include "data.hpp"
 #include "../graphics/i_renderer.hpp"
 #include "../graphics/i_material.hpp"
 
@@ -65,6 +66,8 @@ namespace game {
       rendQ.reserve(100);
     }
     
+    bool isGameplaySystem() const override { return false; }
+    
     void update(ecs::Manager& manager, const float dT) override {
       rendQ.clear();
       auto& sprites = manager.view<Sprite>();
@@ -92,6 +95,12 @@ namespace game {
         auto* k = ks.get(item.e);
         auto* clr = clrs.get(item.e);
         
+        auto* meshPtr = manager.getAsset(spr->mesh);
+        auto* matPtr = manager.getAsset(spr->material);
+        if(!meshPtr || !matPtr) continue;
+        auto& mesh = *meshPtr;
+        auto& mat = *matPtr;
+        
         glm::mat4 model = glm::mat4(1.f);
         model = glm::translate(model, glm::vec3(k->pos, 0.f));
         model = glm::rotate(model, glm::radians(k->rot), glm::vec3(0.f, 0.f, 1.f));
@@ -106,7 +115,7 @@ namespace game {
           .options = opts
         };
         
-        renderer->submit(spr->mesh, spr->material, info);
+        renderer->submit(mesh, mat, info);
       }
       
     }
@@ -118,6 +127,8 @@ namespace game {
   public:
     
     UISystem(GLFWwindow* wnd) : m_wnd(wnd) {}
+    
+    bool isGameplaySystem() const override { return false; }
     
     void update(ecs::Manager& manager, const float dT) override {
       int w, h;
@@ -240,6 +251,8 @@ namespace game {
   public:
     
     GamePlayUISystem(GLFWwindow* wnd) : m_wnd(wnd) {}
+    
+    bool isGameplaySystem() const override { return false; }
     
     void update(ecs::Manager& manager, const float dT) override {
       ecs::EntID pe = ecs::NULL_ENT;
@@ -368,7 +381,7 @@ namespace game {
         
         if(screenX < -100.f || screenX > w + 100.f || screenY < -100.f || screenY > h + 100.f) continue;
         
-        ImVec2 textSize = ImGui::CalcTextSize(item->name.c_str());
+        ImVec2 textSize = ImGui::CalcTextSize(itemNamesDB.get(item->nameHash).c_str());
         ImVec2 textPos(screenX - textSize.x / 2.f, screenY - 20.f);
         
         ImVec2 rectMin(textPos.x - 5.f, textPos.y - 2.f);
@@ -380,7 +393,7 @@ namespace game {
         drawList->AddRectFilled(rectMin, rectMax, bgClr, 3.f);
         
         ImColor textClr = (item->rarity == ItemRarity::Epic) ? ImColor(255, 150, 0) : ImColor(255, 255, 255);
-        drawList->AddText(textPos, textClr, item->name.c_str());
+        drawList->AddText(textPos, textClr, itemNamesDB.get(item->nameHash).c_str());
         
         if(hovered && clicked) {
           pickedUpItems.emplace_back(ie);
@@ -399,20 +412,21 @@ namespace game {
   struct DeathEvent {
     glm::vec2 pos;
     uint32_t enemyIdHash;
-    DeathEvent* next;
   };
+  
   class LootSystem : public ecs::ISystem {
     mip::IRenderer* m_rend;
-    ChunkedMA* m_arena;
-    std::shared_ptr<mip::IMaterial> m_lootMat;
+    ecs::Handle<std::shared_ptr<mip::IMesh>> m_globalQuad;
+    ecs::Handle<std::shared_ptr<mip::IMaterial>> m_lootMat;
+    EventQueue<DeathEvent>& m_dEvs;
     
   public:
-    static inline DeathEvent* frameDeaths = nullptr;
     
-    LootSystem(mip::IRenderer* rend, ChunkedMA* arena) : m_rend(rend), m_arena(arena) {
-      m_lootMat = m_rend->createMaterial("../../assets/shaders/shader.spv");
-      auto tex = m_rend->createTexture("../../assets/textures/whitepixel.png", false);
-      if(tex) m_lootMat->setTexture(0, tex);
+    LootSystem(mip::IRenderer* rend, EventQueue<DeathEvent>& dEv, ecs::Manager& manager, ecs::Handle<std::shared_ptr<mip::IMesh>> globalQuad) : m_rend(rend), m_dEvs(dEv), m_globalQuad(globalQuad) {
+      auto mat = m_rend->createMaterial("../../assets/shaders/shader.spv");
+      auto whiteTex = manager.loadAsset<std::shared_ptr<mip::ITexture>>("../../assets/textures/whitepixel.png");
+      if(auto tex = manager.getAsset(whiteTex)) mat->setTexture(0, *tex);
+      m_lootMat = manager.insertAsset("mat.loot_default", std::move(mat));
     }
     
     void update(ecs::Manager& manager, const float dT) override {
@@ -427,8 +441,7 @@ namespace game {
         break;
       }
       
-      DeathEvent* de = frameDeaths;
-      while(de != nullptr) {
+      for(const auto& ev : m_dEvs.events()) {
         
         bool isGemDrop = (rand() % 100) < 50;
         
@@ -448,18 +461,17 @@ namespace game {
         else if(action == FilterAction::Show) {
           ecs::EntID itemE = manager.createEntity();
           manager.addComponent(itemE, Active{});
-          manager.addComponent(itemE, GroundItem{.name = rolledID, .rarity = rolledRarity});
-          manager.addComponent(itemE, Kinematics{.z = 5, .pos = de->pos, .scale = {30.f, 30.f}});
+          uint32_t id = itemNamesDB.hash(rolledID);
+          itemNamesDB.regStr(id, rolledID);
+          manager.addComponent(itemE, GroundItem{.nameHash = id, .rarity = rolledRarity});
+          manager.addComponent(itemE, Kinematics{.z = 5, .pos = ev.pos, .scale = {30.f, 30.f}});
           glm::vec4 color = (rolledRarity == ItemRarity::Epic) ?  glm::vec4(1.f, 0.5f, 0.f, 1.f) : glm::vec4(0.8f, 0.8f, 0.8f, 1.f);
           manager.addComponent(itemE, ColorTint{.baseColor = color});
-          manager.addComponent(itemE, Sprite{.mesh = m_rend->getGlobalQuad(), .material = m_lootMat});
+          manager.addComponent(itemE, Sprite{.mesh = m_globalQuad, .material = m_lootMat});
           Logger::debug("Gem dropped: {}", rolledID);
         }
         
-        de = de->next;
       }
-      
-      frameDeaths = nullptr;
     }
   };
   
@@ -490,14 +502,6 @@ namespace game {
   class AnimSystem : public ecs::ISystem {
   public:
     void update(ecs::Manager& manager, const float dT) override {
-      
-      //check game state
-      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
-        if (auto* state = manager.getComponent<game::GameState>(e)) {
-          if (state->isPaused) return;
-        }
-        break;
-      }
       
       auto& animators = manager.view<Animator>();
       auto& sprites = manager.view<Sprite>();
@@ -535,7 +539,7 @@ namespace game {
         float frameH = 1.f / anim->rows;
         
         float uvX = (actFrame % anim->cols) * frameW;
-        float uvY = (actFrame % anim->rows) * frameH;
+        float uvY = (actFrame / anim->rows) * frameH;
         
         spr->uvRect = {uvX, uvY, frameW, frameH};
       }
@@ -547,14 +551,6 @@ namespace game {
     MovementSystem() {}
     
     void update(ecs::Manager& manager, const float dT) override {
-      
-      //check game state
-      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
-        if (auto* state = manager.getComponent<game::GameState>(e)) {
-          if (state->isPaused) return;
-        }
-        break;
-      }
       
       auto& ks = manager.view<Kinematics>();
       
@@ -580,14 +576,6 @@ namespace game {
     PlayerControllerSystem(GLFWwindow* wnd) : m_wnd(wnd) {}
     
     void update(ecs::Manager& manager, const float dT) override{
-      
-      //check game state
-      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
-        if (auto* state = manager.getComponent<game::GameState>(e)) {
-          if (state->isPaused) return;
-        }
-        break;
-      }
       
       auto& ks = manager.view<Kinematics>();
       auto& ps = manager.view<PlayerTag>();
@@ -615,14 +603,6 @@ namespace game {
   class PatrolSystem : public ecs::ISystem {
   public:
     void update(ecs::Manager& manager, const float dT) override {
-      
-      //check game state
-      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
-        if (auto* state = manager.getComponent<game::GameState>(e)) {
-          if (state->isPaused) return;
-        }
-        break;
-      }
       
       auto& scripts = manager.view<Script>();
       
@@ -654,21 +634,21 @@ namespace game {
     Task m_waveTask{nullptr};
     float m_waveTimer = 0.f;
     float m_spawnRadius = 800.f;
-    std::shared_ptr<mip::IMaterial> m_enemyMat;
-    ChunkedMA* m_arena;
+    ecs::Handle<std::shared_ptr<mip::IMaterial>> m_enemyMat;
+    ecs::Handle<std::shared_ptr<mip::IMesh>> m_globalQuad;
+    EventQueue<DeathEvent>& m_dEvs;
     
-    float m_speed; //temp need enemyConfigs later
+    float m_speed; //temp, need enemyConfigs later
     
   public:
     
     inline static uint32_t diedCount = 0;
     
-    EnemySpawnerSystem(mip::IRenderer* rend, ChunkedMA* arena) : m_rend(rend) {
-      m_enemyMat = m_rend->createMaterial("../../assets/shaders/shader.spv");
-      auto tex = m_rend->createTexture("../../assets/textures/mob1.png", false);
-      m_enemyMat->setTexture(0, tex);
-      
-      m_arena = arena;
+    EnemySpawnerSystem(mip::IRenderer* rend, EventQueue<DeathEvent>& dEv, ecs::Manager& manager, ecs::Handle<std::shared_ptr<mip::IMesh>> globalQuad) : m_rend(rend), m_dEvs(dEv) , m_globalQuad(globalQuad) {
+      auto mat = m_rend->createMaterial("../../assets/shaders/shader.spv");
+      auto tex = manager.loadAsset<std::shared_ptr<mip::ITexture>>("../../assets/textures/mob1.png");
+      if(auto t = manager.getAsset(tex)) mat->setTexture(0, *t);
+      m_enemyMat = manager.insertAsset("mat.enemy", std::move(mat));
     }
     
     ecs::EntID createEnemy(ecs::Manager& manager, glm::vec2 spawnPos) {
@@ -689,7 +669,6 @@ namespace game {
         if(auto* clr = manager.getComponent<ColorTint>(e)) {
           clr->curColor = clr->baseColor;
         }
-        // manager.getComponent<Health>(e)->iFrames = 0.5f;
       }
       else {
         e = manager.createEntity();
@@ -710,7 +689,7 @@ namespace game {
         });
         manager.getComponent<Health>(e)->cur = manager.getComponent<Health>(e)->max;
         manager.addComponent(e, Sprite{
-          .mesh = m_rend->getGlobalQuad(),
+          .mesh = m_globalQuad,
           .material = m_enemyMat
         });
         manager.addComponent(e, ColorTint{});
@@ -756,13 +735,8 @@ namespace game {
     void update(ecs::Manager& manager, const float dT) override {
       
       ecs::EntID pe = ecs::NULL_ENT;
-      
-      //check game state
-      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
-        pe = e;
-        if (auto* state = manager.getComponent<game::GameState>(e)) {
-          if (state->isPaused) return;
-        }
+      for(auto plE : manager.view<PlayerTag>().getOwners()) {
+        pe = plE;
         break;
       }
       
@@ -805,10 +779,7 @@ namespace game {
           
           auto* kin = manager.getComponent<Kinematics>(e);
           if(kin) {
-            auto* de = m_arena->alloc<DeathEvent>();
-            de->pos = kin->pos;
-            de->next = LootSystem::frameDeaths;
-            LootSystem::frameDeaths = de;
+            m_dEvs.push(DeathEvent{.pos = kin->pos});
           }
           // exp
         }
@@ -843,14 +814,6 @@ namespace game {
     }
     
     void update(ecs::Manager& manager, const float dT) override {
-      
-      //check game state
-      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
-        if (auto* state = manager.getComponent<game::GameState>(e)) {
-          if (state->isPaused) return;
-        }
-        break;
-      }
       
       m_toDestroy.clear();
       
@@ -934,6 +897,12 @@ namespace game {
                 float dist = glm::distance(wk->pos, ek->pos);
                 if(dist < (wc->radius + ec->radius)) {
                   
+                  auto* pierce = manager.getComponent<Pierce>(we);
+                  if(pierce && pierce->hasHit(ee)) {
+                    node = nextNode;
+                    continue;
+                  }
+                  
                   auto* res = manager.getComponent<Resistances>(ee);
                   float totalHitDmg = 0.f;
                   
@@ -968,8 +937,10 @@ namespace game {
                     });
                   }
                   
-                  if(auto* pierce = manager.getComponent<Pierce>(we)) {
+                  if(pierce) {
+                    pierce->addHit(ee);
                     pierce->count--;
+                    
                     if(pierce->count <= 0) {
                       m_toDestroy.emplace_back(we);
                       return;
@@ -1210,14 +1181,6 @@ namespace game {
   public:
     void update(ecs::Manager& manager, const float dT) override {
       
-      //check game state
-      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
-        if (auto* state = manager.getComponent<game::GameState>(e)) {
-          if (state->isPaused) return;
-        }
-        break;
-      }
-      
       auto& healths = manager.view<Health>();
       auto& statuses = manager.view<StatusEffects>();
       auto& acts = manager.view<Active>();
@@ -1250,14 +1213,6 @@ namespace game {
   class AttachmentSystem : public ecs::ISystem {
     void update(ecs::Manager& manager, const float dT) override {
       
-      //check game state
-      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
-        if (auto* state = manager.getComponent<game::GameState>(e)) {
-          if (state->isPaused) return;
-        }
-        break;
-      }
-      
       auto& acts = manager.view<Active>();
       auto& atts = manager.view<AttachTo>().getOwners();
       for(auto e : atts) {
@@ -1277,14 +1232,6 @@ namespace game {
     std::vector<ecs::EntID> m_toDestroy;
     
     void update(ecs::Manager& manager, const float dT) override {
-      
-      //check game state
-      for (auto e : manager.view<game::PlayerTag>().getOwners()) {
-        if (auto* state = manager.getComponent<game::GameState>(e)) {
-          if (state->isPaused) return;
-        }
-        break;
-      }
       
       m_toDestroy.clear();
       

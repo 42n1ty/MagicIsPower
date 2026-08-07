@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../graphics/renderer/vulkan/vk_renderer.hpp"
+#include "../common/eventq.hpp"
 #include "../game/components.hpp"
 #include "../game/loaders.hpp"
 #include "../game/systems.hpp"
@@ -16,7 +17,12 @@ namespace game {
     std::unique_ptr<ecs::Manager> m_manager = nullptr;
     std::unique_ptr<SkillDB> m_skillDB = nullptr;
     std::unique_ptr<ChunkedMA> m_frameArena = nullptr;
-    float scrW, scrH;
+    mip::IRenderer* m_rend;
+    EventQueue<DeathEvent> m_deathEvs;
+    ecs::Handle<std::shared_ptr<mip::IMesh>> m_meshGlobalQuad;
+    ecs::Handle<std::shared_ptr<mip::IMesh>> m_meshUIQuad;
+    ecs::Handle<std::shared_ptr<mip::IMaterial>> m_UIMat;
+    float scrW, scrH, m_timeScale = 1.f;
     
     bool regComponents() {
       m_manager->registerComponent<BgTile>();
@@ -65,13 +71,29 @@ namespace game {
       
       return true;
     }
-    bool regAssets(mip::IRenderer* rend) {
-      TextureLoader tLoader{rend};
+    bool regAssets() {
+      TextureLoader tLoader{m_rend};
       m_manager->registerAsset<std::shared_ptr<mip::ITexture>>(tLoader);
+      
+      m_manager->registerAsset<std::shared_ptr<mip::IMesh>>(MeshLoader{});
+      m_meshGlobalQuad = m_manager->insertAsset("mesh.global_quad", m_rend->getGlobalQuad());
+      m_meshUIQuad = m_manager->insertAsset("mesh.ui_quad", m_rend->getUIQuad());
+      
+      m_manager->registerAsset<std::shared_ptr<mip::IMaterial>>(MaterialLoader{});
+      auto uiMat = m_rend->createMaterial("../../assets/shaders/shader.spv");
+      auto whiteTex = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>("../../assets/textures/whitepixel.png");
+      if(auto tex = m_manager->getAsset(whiteTex)) {
+        uiMat->setTexture(0, *tex);
+      }
+      else {
+        Logger::error("Failed to create ui material!");
+        return false;
+      }
+      m_UIMat = m_manager->insertAsset("mat.ui_default", std::move(uiMat));
       
       return true;
     }
-    bool regSystems(GLFWwindow* wnd, mip::IRenderer* rend) {
+    bool regSystems(GLFWwindow* wnd) {
       m_manager->registerSystem<PlayerControllerSystem>(wnd);
       m_manager->registerSystem<TileSystem>();
       // m_manager->registerSystem<PatrolSystem>();
@@ -80,40 +102,32 @@ namespace game {
       m_manager->registerSystem<LifetimeSystem>();
       m_manager->registerSystem<StatCalcSystem>(m_skillDB.get());
       m_manager->registerSystem<DamageSystem>(m_frameArena.get());
-      m_manager->registerSystem<LootSystem>(rend, m_frameArena.get());
+      m_manager->registerSystem<EnemySpawnerSystem>(m_rend, m_deathEvs, *m_manager, m_meshGlobalQuad); //1
+      m_manager->registerSystem<LootSystem>(m_rend, m_deathEvs, *m_manager, m_meshGlobalQuad); //2
       m_manager->registerSystem<CombatSystem>(m_skillDB.get(), wnd);
       m_manager->registerSystem<VisualEffectsSystem>();
       m_manager->registerSystem<AnimSystem>();
-      m_manager->registerSystem<EnemySpawnerSystem>(rend, m_frameArena.get());
       m_manager->registerSystem<UISystem>(wnd);
       m_manager->registerSystem<GamePlayUISystem>(wnd);
-      m_manager->registerSystem<RenderSystem>(rend);
+      m_manager->registerSystem<RenderSystem>(m_rend);
       
       return true;
     }
     
-    bool createBars(float x, float y, ecs::EntID player, mip::IRenderer* rend) {
-      auto uiMat = rend->createMaterial("../../assets/shaders/shader.spv");
-      auto whiteTexHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>("../../assets/textures/whitepixel.png");
-      if (auto tex = m_manager->getAsset(whiteTexHandle)) uiMat->setTexture(0, *tex);
-      else {
-        Logger::error("Failed to create ui material!");
-        return false;
-      }
-      
+    bool createBars(float x, float y, ecs::EntID player) {
       // hp
       auto hpBg = m_manager->createEntity();
       auto hpAtt = m_manager->addComponent(hpBg, AttachTo{ .target = player, .offset = {-30.f, -60.f} });
       auto hpKin = m_manager->addComponent(hpBg, Kinematics{ .z = 99, .scale = {60.f, 8.f} });
       m_manager->addComponent(hpBg, ColorTint{ .baseColor = {0.1f, 0.1f, 0.1f, 1.f} });
-      m_manager->addComponent(hpBg, Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+      m_manager->addComponent(hpBg, Sprite{ .mesh = m_meshUIQuad, .material = m_UIMat });
 
       auto hpFill = m_manager->createEntity();
       m_manager->addComponent(hpFill, UIProgressBar{ .bType = BarType::HP, .maxW = 60.f });
       m_manager->addComponent(hpFill, AttachTo{hpAtt});
       m_manager->addComponent(hpFill, Kinematics{ .z = 100, .scale = hpKin.scale });
       m_manager->addComponent(hpFill, ColorTint{ .baseColor = {1.f, 0.f, 0.f, 1.f} });
-      m_manager->addComponent(hpFill, Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+      m_manager->addComponent(hpFill, Sprite{ .mesh = m_meshUIQuad, .material = m_UIMat });
 
       // exp
       UIAnchor expAnchor {
@@ -127,7 +141,7 @@ namespace game {
       m_manager->addComponent(expBg, UIAnchor{expAnchor});
       m_manager->addComponent(expBg, Kinematics{ .z = 99 });
       m_manager->addComponent(expBg, ColorTint{ .baseColor = {0.1f, 0.2f, 0.4f, 1.f} });
-      m_manager->addComponent(expBg, Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+      m_manager->addComponent(expBg, Sprite{ .mesh = m_meshUIQuad, .material = m_UIMat });
 
       auto expFill = m_manager->createEntity();
       m_manager->addComponent(expFill, UITag{});
@@ -135,11 +149,22 @@ namespace game {
       m_manager->addComponent(expFill, UIProgressBar{ .bType = BarType::EXP });
       m_manager->addComponent(expFill, Kinematics{ .z = 100 });
       m_manager->addComponent(expFill, ColorTint{ .baseColor = {0.2f, 0.3f, 1.f, 1.f} });
-      m_manager->addComponent(expFill, Sprite{ .mesh = rend->getUIQuad(), .material = uiMat });
+      m_manager->addComponent(expFill, Sprite{ .mesh = m_meshUIQuad, .material = m_UIMat });
       
       return true;
     }
-    
+    bool createSpriteData(const std::string& txtrPath, const std::string& shaderPath, std::string_view key) {
+      auto texHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>( txtrPath);
+      auto mat = m_rend->createMaterial(shaderPath);
+      if(!mat) {
+        Logger::error("{}:{} : Failed to create material", __FILE__, __LINE__);
+        return false;
+      }
+      if (auto tex = m_manager->getAsset(texHandle)) {
+        mat->setTexture(0, *tex);
+      }
+      auto matHandle = m_manager->insertAsset(key, std::move(mat));
+    }
     
   public:
     
@@ -148,25 +173,40 @@ namespace game {
       m_frameArena = std::make_unique<ChunkedMA>();
     }
     
+    EventQueue<DeathEvent>& deathEvs() { return m_deathEvs; }
+    
     bool init(mip::Window* wnd, mip::IRenderer* rend) {
-      m_skillDB = std::make_unique<SkillDB>(rend);
+      m_rend = rend;
+      
+      if(!regAssets()) return false;
+      
+      m_skillDB = std::make_unique<SkillDB>(m_rend, m_meshGlobalQuad);
       
       if(
            !regComponents()
-        || !regAssets(rend)
-        || !regSystems(wnd->getWindow(), rend)
+        || !regSystems(wnd->getWindow())
       ) return false;
       
       Logger::info("Scene initialized successfully.");
       return true;
     }
     
-    bool update(const float dT, mip::IRenderer* rend, const float w, const float h) {
+    bool update(const float dT, const float w, const float h) {
       
       m_frameArena->reset();
+      m_deathEvs.clear();
+      
+      //time
+      float timeScale = 1.f;
+      for(auto e : m_manager->view<GameState>().getOwners()) {
+        if(auto* state = m_manager->getComponent<GameState>(e)) {
+          timeScale = state->isPaused ? 0.f : 1.f;
+        }
+        break;
+      }
       
       // ImGui
-      auto* vkRend = static_cast<mip::VulkanRenderer*>(rend);
+      auto* vkRend = static_cast<mip::VulkanRenderer*>(m_rend);
       vkRend->beginImGuiFrame();
       // ImGui::ShowDemoWindow();
       
@@ -187,10 +227,10 @@ namespace game {
       view = glm::translate(view, glm::vec3(-playerPos.x, -playerPos.y, 0.f));
       camData.view = view;
       
-      if(!rend->beginFrame(camData)) return false;
-      m_manager->update(dT);
+      if(!m_rend->beginFrame(camData)) return false;
+      m_manager->update(dT, timeScale);
       vkRend->renderImGui();
-      if(!rend->endFrame()) return false;
+      if(!m_rend->endFrame()) return false;
       
       if(auto* ph = m_manager->getComponent<Health>(ps.getOwners()[0]); ph->cur <= 0) {
         Logger::debug("Player died!");
@@ -200,7 +240,7 @@ namespace game {
       return true;
     }
     
-    bool createLevel(float width, float height, mip::IRenderer* rend, const std::string& txtrPath) {
+    bool createLevel(float width, float height, const std::string& txtrPath) {
       auto map = m_manager->createEntity();
       m_manager->addComponent(map, Kinematics{
         .z = 0,
@@ -208,25 +248,29 @@ namespace game {
         .scale = {width, height},
         .rot = 0.f
       });
-      auto texHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);
-      auto mapMat = rend->createMaterial("../../assets/shaders/shader.spv");
-      if(!mapMat) {
-        Logger::error("Failed to create material for sprite!");
-        return false;
-      }
-      if (auto tex = m_manager->getAsset(texHandle)) {
-        mapMat->setTexture(0, *tex);
-      }
-      m_manager->addComponent(map, Sprite{
-        .mesh = rend->getGlobalQuad(),
-        .material = mapMat
-      });
+      
+      auto matKey = "mat.map";
+      if(!createSpriteData(txtrPath, "../../assets/shaders/shader.spv", matKey)) return false;
+      // auto texHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);
+      // auto mapMat = m_rend->createMaterial("../../assets/shaders/shader.spv");
+      // if(!mapMat) {
+      //   Logger::error("Failed to create material for sprite!");
+      //   return false;
+      // }
+      // if (auto tex = m_manager->getAsset(texHandle)) {
+      //   mapMat->setTexture(0, *tex);
+      // }
+      // auto matHandle = m_manager->insertAsset(matKey, std::move(mapMat));
+      // m_manager->addComponent(map, Sprite{
+      //   .mesh = m_meshGlobalQuad,
+      //   .material = matHandle
+      // });
       
       return true;
     }
-    bool createTileLevel(mip::IRenderer* rend, const std::string& txtrPath) {
+    bool createTileLevel(const std::string& txtrPath) {
       auto tileTxtr = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);
-      auto tileMat = rend->createMaterial("../../assets/shaders/shader.spv");
+      auto tileMat = m_rend->createMaterial("../../assets/shaders/shader.spv");
       if(!tileMat) {
         Logger::error("Failed to create material for sprite!");
         return false;
@@ -234,6 +278,8 @@ namespace game {
       if (auto tex = m_manager->getAsset(tileTxtr)) {
         tileMat->setTexture(0, *tex);
       }
+      auto matKey = "mat.tile";
+      auto matHandle = m_manager->insertAsset(matKey, std::move(tileMat));
       
       for(int x = -1; x <= 1; ++x) {
         for(int y = -1; y <= 1; ++y) {
@@ -245,15 +291,15 @@ namespace game {
           });
           m_manager->addComponent(tile, BgTile{.offset = {static_cast<float>(x), static_cast<float>(y)}});
           m_manager->addComponent(tile, Sprite{
-            .mesh = rend->getGlobalQuad(),
-            .material = tileMat
+            .mesh = m_meshGlobalQuad,
+            .material = matHandle
           });
         }
       }
       
       return true;
     }
-    bool createPlayer(float x, float y, mip::IRenderer* rend, const std::string& txtrPath) {
+    bool createPlayer(float x, float y, const std::string& txtrPath) {
       auto player = m_manager->createEntity();
       m_manager->addComponent(player, PlayerTag{});
       m_manager->addComponent(player, GameState{});
@@ -271,7 +317,7 @@ namespace game {
       m_manager->getComponent<Health>(player)->cur = m_manager->getComponent<Health>(player)->max;
       
       auto texHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);
-      auto playerMat = rend->createMaterial("../../assets/shaders/shader.spv");
+      auto playerMat = m_rend->createMaterial("../../assets/shaders/shader.spv");
       if(!playerMat) {
         Logger::error("Failed to create material for player!");
         return false;
@@ -279,14 +325,16 @@ namespace game {
       if (auto tex = m_manager->getAsset(texHandle)) {
         playerMat->setTexture(0, *tex);
       }
+      auto matKey = "mat.player" + std::to_string(player);
+      auto matHandle = m_manager->insertAsset(matKey, std::move(playerMat));
       m_manager->addComponent(player, Sprite{
-        .mesh = rend->getGlobalQuad(),
-        .material = playerMat,
+        .mesh = m_meshGlobalQuad,
+        .material = matHandle,
       });
       m_manager->addComponent(player, ColorTint{});
       m_manager->addComponent(player, Exp{.cur = 5});
       
-      if(!createBars(x, y, player, rend)) return false;
+      if(!createBars(x, y, player)) return false;
       
       m_manager->addComponent(player, Animator{
         .cols = 4,
@@ -323,7 +371,7 @@ namespace game {
       
       return true;
     }
-    bool createMobs(float x, float y, mip::IRenderer* rend, const std::string& txtrPath) {
+    bool createMobs(float x, float y, const std::string& txtrPath) {
       auto mob = m_manager->createEntity();
       m_manager->addComponent(mob, Kinematics{
         .z = 1,
@@ -334,7 +382,7 @@ namespace game {
       m_manager->addComponent(mob, Script{.task = squarePatrol(*m_manager, mob, 2.f, 3.f, 150.f)});
       
       auto texHandle = m_manager->loadAsset<std::shared_ptr<mip::ITexture>>(txtrPath);
-      auto mobMat = rend->createMaterial("../../assets/shaders/shader.spv");
+      auto mobMat = m_rend->createMaterial("../../assets/shaders/shader.spv");
       if(!mobMat) {
         Logger::error("Failed to create material for mob!");
         return false;
@@ -342,9 +390,11 @@ namespace game {
       if (auto tex = m_manager->getAsset(texHandle)) {
         mobMat->setTexture(0, *tex);
       }
+      auto matKey = "mobMat";
+      auto matHandle = m_manager->insertAsset(matKey, std::move(mobMat));
       m_manager->addComponent(mob, Sprite{
-        .mesh = rend->getGlobalQuad(),
-        .material = mobMat
+        .mesh = m_meshGlobalQuad,
+        .material = matHandle
       });
       
       return true;
